@@ -283,3 +283,5 @@ span.chip{cursor:default}
 .msg-warn .check{color:var(--warn)}
 .btn{text-decoration:none}
 textarea.in{font-family:inherit;resize:vertical}
+.help{width:100%;background:none;border:0;color:inherit;text-align:left;padding:0;cursor:pointer;border-radius:14px}
+.help:hover b{text-decoration:underline}
