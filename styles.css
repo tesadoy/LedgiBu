@@ -279,3 +279,7 @@ span.chip{cursor:default}
 .btn[disabled]{opacity:.6;cursor:progress;transform:none}
 
 .newhere{margin-top:18px;padding-top:18px;border-top:1px solid var(--line);display:grid;gap:10px;text-align:center;color:var(--muted);font-size:14px}
+.msg-warn{padding:14px 16px;border-radius:14px;background:var(--warn-soft);color:var(--warn);font-weight:600;margin-bottom:16px;font-size:14px}
+.msg-warn .check{color:var(--warn)}
+.btn{text-decoration:none}
+textarea.in{font-family:inherit;resize:vertical}
