@@ -58,7 +58,7 @@ var svg=function(k,w){return '<svg viewBox="0 0 24 24" width="'+(w||22)+'" heigh
 /* ---------- connection ---------- */
 var sb=null,configured=/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(CFG.SUPABASE_URL||'')&&!!CFG.SUPABASE_KEY&&!/YOUR-PROJECT/.test(CFG.SUPABASE_URL);
 if(configured&&window.supabase){sb=window.supabase.createClient(CFG.SUPABASE_URL,CFG.SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}})}
-var REDIRECT=location.origin+location.pathname;
+var REDIRECT=(location.origin+location.pathname).replace(/index\.html$/,'');
 
 /* ---------- state ---------- */
 var S={user:null,profile:null,biz:[],bid:null,sales:[],exps:[],reps:[],alloc:{},tSales:[],tExps:[],mem:[],inv:[],profs:{},ready:false,tok:0};
@@ -148,7 +148,7 @@ function saleRec(s,tools){var bal=saleBal(s),paid=s.price-bal,pc=Math.round(paid
   '<div class="amt">'+money(s.price)+'<small>Sale price</small></div><div class="row2">'+st+'<div class="bar" aria-hidden="true"><i style="width:'+pc+'%"></i></div><span class="s'+(bal>0?' red':'')+'">'+(bal>0?money(bal)+' still owed':'Received '+money(paid))+'</span>'+btns+'</div></div>'}
 function expRec(e){var btns='';if(can('edit'))btns+='<button class="icon-btn" data-edit-exp="'+e.id+'" aria-label="Edit expense">'+svg('edit',18)+'</button>';if(can('delete'))btns+='<button class="icon-btn" data-del-exp="'+e.id+'" aria-label="Move to trash">'+svg('trash',18)+'</button>';
  return '<div class="rec"><div class="ico out">'+svg('out',20)+'</div><div style="min-width:0"><div class="t">'+esc(e.what)+'</div><div class="s">'+esc(e.cat)+' · '+dstr(e.date)+'</div></div><div class="amt red">'+money(e.amount)+'</div>'+(btns?'<div class="row2">'+btns+'</div>':'')+'</div>'}
-function repRec(r){return '<div class="rec"><div class="ico">'+svg('in',20)+'</div><div style="min-width:0"><div class="t">'+esc(r.cust)+'</div><div class="s">Repayment · '+dstr(r.date)+'</div></div><div class="amt">'+money(r.amount)+'</div><div class="row2"><span class="pill rep">Repayment</span><span class="s">Cleared the oldest debt first</span></div></div>'}
+function repRec(r){return '<div class="rec"><div class="ico">'+svg('in',20)+'</div><div style="min-width:0"><div class="t">'+esc(r.cust)+'</div><div class="s">Repayment · '+dstr(r.date)+'</div></div><div class="amt">'+money(r.amount)+'</div><div class="row2"><span class="pill rep">Repayment</span><span class="s">Cleared the oldest debt first</span>'+(can('edit')?'<button class="icon-btn" data-edit-rep="'+r.id+'" aria-label="Edit payment">'+svg('edit',18)+'</button>':'')+'</div></div>'}
 function debtRec(d){var paid=d.total-d.owed,pc=Math.round(paid/d.total*100);var oldest=d.list.slice().sort(function(a,b){return a.date<b.date?-1:1})[0].date;
  return '<div class="rec"><div class="ico owe">'+esc(ini(d.name))+'</div><div style="min-width:0"><div class="t">'+esc(d.name)+'</div><div class="s">'+d.list.length+' unpaid '+(d.list.length>1?'sales':'sale')+' · oldest '+dstr(oldest)+'</div></div>'+
   '<div class="amt red">'+money(d.owed)+'<small>still owed</small></div><div class="row2"><div class="bar" aria-hidden="true"><i style="width:'+pc+'%"></i></div><span class="s">Paid '+pc+'% of '+money(d.total)+'</span>'+(can('record')?'<button class="btn small" data-act="repay" data-c="'+esc(d.name)+'">Receive payment</button>':'')+'</div></div>'}
@@ -222,7 +222,7 @@ function vTeam(){
   var p=S.profs[m.user_id]||{},nm=p.full_name||p.email||'Team member';
   rows+='<div class="rec"><div class="ico">'+esc(ini(nm))+'</div><div style="min-width:0"><div class="t">'+esc(nm)+(m.user_id===S.user.id?' (you)':'')+'</div><div class="s">'+esc(p.email||'')+'</div></div><div class="amt"><span class="pill '+(m.role==='owner'?'':'rep')+'">'+(m.role==='owner'?'Owner':'Team member')+'</span></div>'+
    '<div class="row2"><div class="chips">'+chip(m,'record','Can add records')+chip(m,'edit','Can edit')+chip(m,'delete','Can delete')+'</div>'+(isOwner()&&m.role!=='owner'?'<button class="btn small danger" data-remove-member="'+m.user_id+'" style="margin-left:auto">Remove access</button>':'')+'</div></div>'});
- S.inv.forEach(function(i){rows+='<div class="rec"><div class="ico owe" style="background:var(--warn-soft);color:var(--warn)">'+svg('users',20)+'</div><div style="min-width:0"><div class="t">'+esc(i.email)+'</div><div class="s">Waiting for them to create an account</div></div><div class="amt"><span class="pill part">Invited</span></div><div class="row2"><button class="btn small danger" data-cancel-invite="'+i.id+'">Cancel invite</button></div></div>'});
+ S.inv.forEach(function(i){rows+='<div class="rec"><div class="ico owe" style="background:var(--warn-soft);color:var(--warn)">'+svg('users',20)+'</div><div style="min-width:0"><div class="t">'+esc(i.email)+'</div><div class="s">Waiting for them to create an account</div></div><div class="amt"><span class="pill part">Invited</span></div><div class="row2"><button class="btn small" data-share-invite="'+esc(i.email)+'">Copy invite message</button><button class="btn small danger" data-cancel-invite="'+i.id+'">Cancel invite</button></div></div>'});
  var form=isOwner()?(used<lim?'<div class="inv-form"><h3 style="font:700 17px var(--f-display);margin-bottom:12px">Add a team member</h3><div class="field"><label for="invEmail">Their email</label><input class="in" id="invEmail" type="email" autocomplete="off" placeholder="name@example.com"></div>'+
   '<div class="chips"><label class="check" style="margin:0"><input type="checkbox" id="pRec" checked>Can add records</label><label class="check" style="margin:0"><input type="checkbox" id="pEdit">Can edit</label><label class="check" style="margin:0"><input type="checkbox" id="pDel">Can delete</label></div><div class="err" id="invErr" role="alert"></div><button class="btn small" data-act="invite">Add team member</button></div>'
   :'<div class="inv-form"><p class="section-sub">You have used '+used+' of '+lim+' team member'+(lim>1?'s':'')+' on the '+(plan()==='premium'?'Premium':'Free')+' plan.</p>'+(plan()==='premium'?'':'<div style="margin-top:12px"><button class="btn gold small" data-act="plans" data-f="Adding more team members">See Premium</button></div>')+'</div>'):'';
@@ -305,6 +305,24 @@ function repayModal(c){var owe=owedBy(c);modal('<h2>Receive payment</h2><p>'+esc
    var r=await sb.rpc('record_repayment',{p_business:S.bid,p_customer:c,p_amount:a,p_date:f.get('d')||iso(NOW)});if(r.error)return fe(r.error);
    await refresh();toast(owedBy(c)<=0?c+' has paid in full':'Payment saved')})}
 
+function repEditModal(r){var owe=owedBy(r.cust),max=Math.round((owe+r.amount)*100)/100;
+ modal('<h2>Edit payment</h2><p>Fix a mistake in this payment from '+esc(r.cust)+'. They owe '+money(owe)+' right now.</p>'+err0+
+  fld('fa','Amount received','<input class="in" id="fa" name="a" inputmode="decimal" value="'+r.amount+'">','The most this payment can be is '+money(max)+'.')+
+  fld('fd','Date','<input class="in" id="fd" name="d" type="date" value="'+esc(r.date)+'">')+
+  '<div id="warn" class="msg-warn" hidden>Lowering this payment means '+esc(r.cust)+' will owe more again.<label class="check" style="margin:10px 0 0"><input type="checkbox" name="ack" id="ack">I understand</label></div>'+
+  '<div class="actions">'+cancel+'<button class="btn" type="submit">Save changes</button></div>',
+  async function(f){var a=num(f.get('a'));if(!(a>0))return 'Enter the amount received.';if(a>max)return 'That is more than '+r.cust+' owes. The most this payment can be is '+money(max)+'.';
+   if(a<r.amount&&!f.get('ack'))return 'Tick "I understand" to confirm that '+r.cust+' will owe '+money(r.amount-a)+' more.';
+   var x=await sb.rpc('edit_repayment',{p_repayment:r.id,p_amount:a,p_date:f.get('d')||r.date});if(x.error)return fe(x.error);toast('Payment updated');await refresh()});
+ $('#fa').addEventListener('input',function(){$('#warn').hidden=!(num(this.value)<r.amount)})}
+function inviteMsg(email,kind){var link=(location.origin+location.pathname).replace(/index\.html$/,''),b=cur().name;
+ return kind==='added'?'Hi, I have added you to '+b+' on LedgiBu. Open '+link+', sign in, and choose '+b+' under "Switch workspace".'
+  :'Hi, I have invited you to help with '+b+' on LedgiBu.\n1. Open '+link+'\n2. Tap "Create your profile" and use this exact email: '+email+'\n3. Confirm your email from the message we send you, then sign in.\nYou will see '+b+' in your account.'}
+function inviteModal(email,kind){var msg=inviteMsg(email,kind);
+ modal('<h2>Send them the invite</h2><p>'+(kind==='added'?'They already have a profile, so they can open '+esc(cur().name)+' now. Let them know:':'No email goes out automatically. Send them this message:')+'</p><div class="field"><label for="im">Message</label><textarea class="in" id="im" rows="8" readonly style="height:auto;padding:12px 16px;line-height:1.5"></textarea></div>'+
+  '<div class="actions"><button class="btn ghost" data-close>Done</button><a class="btn ghost" target="_blank" rel="noopener" href="https://wa.me/?text='+encodeURIComponent(msg)+'">Send on WhatsApp</a><button class="btn" type="button" id="cpy">Copy message</button></div>',function(){});
+ $('#im').value=msg;
+ $('#cpy').onclick=async function(){try{await navigator.clipboard.writeText(msg);toast('Message copied')}catch(e){var t=$('#im');t.focus();t.select();try{document.execCommand('copy');toast('Message copied')}catch(x){toast('Press and hold the message to copy it')}}}}
 function bizForm(first){var opts=Object.keys(CURN).map(function(k){return '<option value="'+k+'">'+esc(CURN[k])+'</option>'}).join('');
  return err0+fld('fn','Business name','<input class="in" id="fn" name="n" maxlength="80" placeholder="'+(first?'For example, Ada Fabrics':'Business name')+'">',first?'Using this for yourself? Call it "My money".':'')+fld('fcur','Currency','<select class="in" id="fcur" name="cur">'+opts+'</select>')}
 async function createBiz(f){var n=(f.get('n')||'').trim();if(!n)return 'Enter a business name.';
@@ -333,7 +351,11 @@ function authScreen(mode,note){
  if(mode==='recover')h+='<h2>Choose a new password</h2><p>Use at least 8 characters.</p><form id="af" data-mode="recover" novalidate><div class="err" id="aerr" role="alert"></div>'+pwField('ap','New password','new-password')+'<button class="btn" style="width:100%" type="submit">Save password</button></form>';
  if(mode==='check')h+='<h2>Check your email</h2><p>'+esc(note)+'</p><button class="btn" style="width:100%" data-auth="in">Back to sign in</button>';
  gate(h);var f=$('#ae')||$('#ap');if(f)f.focus()}
-function setupScreen(){gate(BRAND+'<h2>Almost ready</h2><p>This copy of LedgiBu is not connected to its database yet. Open <b>config.js</b>, enter your Supabase address and key, and reload this page.</p>')}
+function setupScreen(){
+ var why=!window.supabase?'The file <b>vendor/supabase.js</b> did not load. Check that the <b>vendor</b> folder was uploaded to your GitHub repository, then reload this page.'
+  :!window.LEDGIBU?'The file <b>config.js</b> did not load. Check that it was uploaded to your GitHub repository, then reload this page.'
+  :'The settings in <b>config.js</b> are not filled in correctly. Check the Supabase address and key, then reload this page.';
+ gate(BRAND+'<h2>Almost ready</h2><p>'+why+'</p>')}
 function onboard(){var nm=(S.profile&&S.profile.full_name)||'';
  gate(BRAND+'<h2>Welcome'+(nm?', '+esc(nm.split(' ')[0]):'')+'</h2><p>Let us set up your first business. You can add more later.</p><form id="obf" novalidate>'+bizForm(true)+'<button class="btn" style="width:100%" type="submit">Start keeping my books</button></form><div class="auth-links"><button class="link-btn" id="obOut">Log out</button></div>');
  $('#obf').addEventListener('submit',async function(e){e.preventDefault();var b=e.target.querySelector('[type=submit]'),er=$('#merr');b.disabled=true;er.classList.remove('on');
@@ -391,7 +413,9 @@ document.addEventListener('click',async function(e){
    if(!/^\S+@\S+\.\S+$/.test(em)){er.textContent='Enter a valid email address.';er.classList.add('on');return}
    el.disabled=true;var ri=await sb.rpc('invite_member',{p_business:S.bid,p_email:em,p_record:$('#pRec').checked,p_edit:$('#pEdit').checked,p_delete:$('#pDel').checked});el.disabled=false;
    if(ri.error){if(/plan allows/i.test(ri.error.message||'')){planModal('Adding more team members')}else{er.textContent=fe(ri.error);er.classList.add('on')}return}
-   toast(ri.data==='added'?'Added to your team':'Invite saved. They get access when they create an account with that email.');await refresh()}
+   await refresh();inviteModal(em,ri.data)}
+ else if(a.shareInvite)inviteModal(a.shareInvite,'invited')
+ else if(a.editRep){var rp=S.reps.filter(function(y){return y.id===a.editRep})[0];if(rp)repEditModal(rp)}
  else if(a.rt){rep.type=a.rt;rep.off=0;render()}else if(a.ro){var n=rep.off+(+a.ro);if(n<=0){rep.off=n;render()}}
  else if(a.themeSet){theme=a.themeSet;store.set('lg_theme',theme);applyTheme();render()}
  else if(a.ws){S.bid=a.ws;store.set('lg_bid',S.bid);S.ready=false;render();toast('Now working in '+cur().name);await loadData();render();location.hash='overview'}
