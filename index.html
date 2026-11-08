@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LedgiBu</title>
+<meta name="description" content="Simple bookkeeping for your business or personal money.">
+<meta name="theme-color" content="#0F4A3C">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+<script>try{var t=localStorage.getItem('lg_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+</head>
+<body>
+<noscript><p style="padding:24px">LedgiBu needs JavaScript. Please turn it on in your browser.</p></noscript>
+
+<div id="gate" class="gate" hidden></div>
+
+<div id="app" hidden>
+  <aside class="side" id="side" aria-label="Main menu">
+    <div class="brand">
+      <div class="mark"><img src="icons/mark.svg" alt="" width="36" height="40"></div>
+      <div><b>LedgiBu</b><small>BOOKKEEPING</small></div>
+    </div>
+    <div class="side-label">WORKSPACE</div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <div class="help"><i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="16" rx="3"/><path d="M9 9h6M9 13h4"/></svg></i>
+        <div><b>Need a hand with your books?</b><span>Your records, made simple.</span></div></div>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <main class="main">
+    <div class="wrap">
+      <div class="topbar">
+        <button class="icon-btn" id="menuBtn" aria-label="Open menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
+        <div style="min-width:0"><small>ACTIVE BUSINESS</small><b id="tbName"></b></div>
+        <div class="ava" id="tbAva"></div>
+      </div>
+      <div class="ws-line"><div class="ava" id="wsAva"></div><div style="min-width:0"><small>ACTIVE WORKSPACE</small><b id="wsName"></b></div><span class="role" id="wsRole"></span></div>
+      <div id="view"></div>
+    </div>
+  </main>
+  <nav class="bottom" id="bottom" aria-label="Quick pages"></nav>
+</div>
+
+<div id="layer"></div>
+<div id="offline" class="offline" hidden>You are offline. Changes cannot be saved until you reconnect.</div>
+
+<script src="config.js"></script>
+<script src="vendor/supabase.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
