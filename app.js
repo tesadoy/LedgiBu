@@ -51,6 +51,7 @@ var I={
  globe:'<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.5 3.5 5.5 3.5 8.5s-1 6-3.5 8.5c-2.5-2.5-3.5-5.5-3.5-8.5s1-6 3.5-8.5"/>',
  palette:'<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.4 0 2-1 1.6-2.1-.4-1.1.2-2.4 1.5-2.4H17a3.5 3.5 0 0 0 3.5-3.5C20.5 7 16.8 3.5 12 3.5Z"/><circle cx="8" cy="11" r="1"/><circle cx="12" cy="7.8" r="1"/><circle cx="16" cy="10" r="1"/>',
  crown:'<path d="m4 8 4 4 4-6 4 6 4-4-1.5 10h-13z"/>',list:'<path d="M8.5 6.5H20M8.5 12H20M8.5 17.5H20M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01"/>',
+ chat:'<path d="M5 5.5h14A1.5 1.5 0 0 1 20.5 7v8a1.5 1.5 0 0 1-1.5 1.5h-8L6.5 20v-3.5H5A1.5 1.5 0 0 1 3.5 15V7A1.5 1.5 0 0 1 5 5.5Z"/><path d="M8 10h8M8 13h5"/>',
  left:'<path d="M14.5 6 8.5 12l6 6"/>',right:'<path d="m9.5 6 6 6-6 6"/>'
 };
 var svg=function(k,w){return '<svg viewBox="0 0 24 24" width="'+(w||22)+'" height="'+(w||22)+'" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+I[k]+'</svg>'};
@@ -244,6 +245,7 @@ function vPrefs(){var w=cur(),own=isOwner();
  '<div class="field"><label for="langSel">Language</label><select class="in" id="langSel"><option>English</option></select><small>More languages will be added later.</small></div></section>'+
  vTeam()+
  '<section class="card">'+ttl('palette','Theme')+'<p class="section-sub" style="margin-bottom:18px">Choose how LedgiBu looks on this device.</p><div class="seg" role="group" aria-label="Theme">'+[['light','Light'],['dark','Dark'],['system','Match my device']].map(function(k){return '<button data-theme-set="'+k[0]+'" aria-pressed="'+(theme===k[0])+'">'+k[1]+'</button>'}).join('')+'</div></section>'+
+ '<section class="card">'+ttl('chat','Help and feedback')+'<p class="section-sub" style="margin-bottom:16px">Found a problem or have an idea? Tell us, and we will read it.</p><button class="btn ghost small" data-act="feedback">Send feedback</button></section>'+
  '<section class="card">'+ttl('users','Your account')+'<div class="kv"><span>Name</span><b>'+esc((S.profile&&S.profile.full_name)||'')+'</b></div><div class="kv"><span>Email</span><b style="overflow-wrap:anywhere">'+esc(S.user.email)+'</b></div><div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn ghost small" data-act="pwreset">Email me a password reset link</button><button class="btn ghost small" id="logoutBtn">Log out</button></div></section>'+
  (can('delete')?'<section class="card">'+ttl('trash','Trash','red')+'<p class="section-sub">Deleted items stay here for 30 days. Restore them or delete them for good.</p><div class="recs">'+(tr||empty('Trash is empty','Items you delete will wait here for 30 days.'))+'</div></section>':'')+'</div>'}
 
@@ -323,6 +325,20 @@ function inviteModal(email,kind){var msg=inviteMsg(email,kind);
   '<div class="actions"><button class="btn ghost" data-close>Done</button><a class="btn ghost" target="_blank" rel="noopener" href="https://wa.me/?text='+encodeURIComponent(msg)+'">Send on WhatsApp</a><button class="btn" type="button" id="cpy">Copy message</button></div>',function(){});
  $('#im').value=msg;
  $('#cpy').onclick=async function(){try{await navigator.clipboard.writeText(msg);toast('Message copied')}catch(e){var t=$('#im');t.focus();t.select();try{document.execCommand('copy');toast('Message copied')}catch(x){toast('Press and hold the message to copy it')}}}}
+var FEEDBACK_EMAIL='tesadoydynamicslimited@gmail.com';
+function feedbackModal(){
+ function compose(){var k=$('#fbk').value,m=($('#fbm').value||'').trim();
+  var body=m+'\n\n---\nFrom: '+((S.user&&S.user.email)||'')+'\nPage: '+route()+'\nDevice: '+navigator.userAgent+'\nApp: LedgiBu '+location.origin+location.pathname;
+  return {subject:'LedgiBu feedback: '+k,body:body,message:m}}
+ modal('<h2>Send feedback</h2><p>Tell us what is not working, or what would make LedgiBu better. Your message opens in your email app, and you can read it before you send it.</p>'+err0+
+  fld('fbk','What is it about','<select class="in" id="fbk" name="k"><option>Something is not working</option><option>An idea or request</option><option>Something I like</option></select>')+
+  fld('fbm','Your message','<textarea class="in" id="fbm" name="m" rows="5" style="height:auto;padding:12px 16px;line-height:1.5" placeholder="Describe what happened or what you would like."></textarea>','We add your email and your phone or browser type so we can reply and fix problems. No records or amounts are included.')+
+  '<div class="actions">'+cancel+'<button class="btn" type="button" id="fbSend">Open in my email app</button></div>'+
+  '<p style="margin-top:16px;font-size:13px;color:var(--muted)">Nothing opened? Send your message to <b style="user-select:all">'+FEEDBACK_EMAIL+'</b> yourself, or <button type="button" class="link-btn" id="fbCopy">copy it</button>.</p>',function(){});
+ $('#fbSend').onclick=function(){var c=compose(),er=$('#merr');if(!c.message){er.textContent='Write your message first.';er.classList.add('on');return}er.classList.remove('on');
+  window.location.href='mailto:'+FEEDBACK_EMAIL+'?subject='+encodeURIComponent(c.subject)+'&body='+encodeURIComponent(c.body)};
+ $('#fbCopy').onclick=async function(){var c=compose(),er=$('#merr');if(!c.message){er.textContent='Write your message first.';er.classList.add('on');return}er.classList.remove('on');
+  var t='To: '+FEEDBACK_EMAIL+'\nSubject: '+c.subject+'\n\n'+c.body;try{await navigator.clipboard.writeText(t);toast('Message copied')}catch(e){toast('Press and hold your message to copy it')}}}
 function bizForm(first){var opts=Object.keys(CURN).map(function(k){return '<option value="'+k+'">'+esc(CURN[k])+'</option>'}).join('');
  return err0+fld('fn','Business name','<input class="in" id="fn" name="n" maxlength="80" placeholder="'+(first?'For example, Ada Fabrics':'Business name')+'">',first?'Using this for yourself? Call it "My money".':'')+fld('fcur','Currency','<select class="in" id="fcur" name="cur">'+opts+'</select>')}
 async function createBiz(f){var n=(f.get('n')||'').trim();if(!n)return 'Enter a business name.';
@@ -403,11 +419,13 @@ document.addEventListener('click',async function(e){
  if(el.id==='logoutLink'){e.preventDefault();openMenu(false);confirmOut();return}
  if(el.id==='moreBtn'){openMenu(true);return}
  if(el.id==='logoutBtn'){confirmOut();return}
+ if(el.id==='helpBtn'){feedbackModal();return}
  if(a.auth){e.preventDefault();authScreen(a.auth);return}
  if(!S.user)return;
  try{
  if(a.act==='sale')saleModal(false);else if(a.act==='debtor')saleModal(true);else if(a.act==='exp')expModal();else if(a.act==='repay')repayModal(a.c);else if(a.act==='newws')newWs();
  else if(a.act==='plans')planModal(a.f);
+ else if(a.act==='feedback')feedbackModal();
  else if(a.act==='pwreset'){var r=await sb.auth.resetPasswordForEmail(S.user.email,{redirectTo:REDIRECT});toast(r.error?fe(r.error):'We sent a reset link to '+S.user.email)}
  else if(a.act==='invite'){var em=($('#invEmail').value||'').trim().toLowerCase(),er=$('#invErr');er.classList.remove('on');
    if(!/^\S+@\S+\.\S+$/.test(em)){er.textContent='Enter a valid email address.';er.classList.add('on');return}
