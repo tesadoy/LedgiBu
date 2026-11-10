@@ -325,7 +325,7 @@ function inviteModal(email,kind){var msg=inviteMsg(email,kind);
   '<div class="actions"><button class="btn ghost" data-close>Done</button><a class="btn ghost" target="_blank" rel="noopener" href="https://wa.me/?text='+encodeURIComponent(msg)+'">Send on WhatsApp</a><button class="btn" type="button" id="cpy">Copy message</button></div>',function(){});
  $('#im').value=msg;
  $('#cpy').onclick=async function(){try{await navigator.clipboard.writeText(msg);toast('Message copied')}catch(e){var t=$('#im');t.focus();t.select();try{document.execCommand('copy');toast('Message copied')}catch(x){toast('Press and hold the message to copy it')}}}}
-var FEEDBACK_EMAIL='tesadoydynamicslimited@gmail.com';
+var FEEDBACK_EMAIL='ledgibu.app@tesadoy.com';
 function feedbackModal(){
  function compose(){var k=$('#fbk').value,m=($('#fbm').value||'').trim();
   var body=m+'\n\n---\nFrom: '+((S.user&&S.user.email)||'')+'\nPage: '+route()+'\nDevice: '+navigator.userAgent+'\nApp: LedgiBu '+location.origin+location.pathname;
