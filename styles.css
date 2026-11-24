@@ -287,3 +287,6 @@ textarea.in{font-family:inherit;resize:vertical}
 .help:hover b{text-decoration:underline}
 
 .check.agree{align-items:flex-start;margin:4px 0 16px;line-height:1.45}.check.agree input{margin-top:2px;flex:none}.check.agree a{color:var(--green2);font-weight:600}
+
+.payline{margin:4px 0 16px;padding:14px 16px;border-radius:14px;background:var(--gold-soft);color:var(--ink);font-size:15px}.payline b{font:700 20px var(--f-display)}
+.modal .ws-card{width:100%}

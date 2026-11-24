@@ -62,13 +62,15 @@ if(configured&&window.supabase){sb=window.supabase.createClient(CFG.SUPABASE_URL
 var REDIRECT=(location.origin+location.pathname).replace(/index\.html$/,'');
 
 /* ---------- state ---------- */
-var S={user:null,profile:null,biz:[],bid:null,sales:[],exps:[],reps:[],alloc:{},tSales:[],tExps:[],mem:[],inv:[],profs:{},ready:false,tok:0};
+var S={user:null,profile:null,biz:[],bid:null,sales:[],exps:[],reps:[],alloc:{},tSales:[],tExps:[],locked:{},mem:[],inv:[],profs:{},ready:false,tok:0};
 function cur(){return S.biz.filter(function(b){return b.id===S.bid})[0]||null}
 function isOwner(){var c=cur();return !!c&&c.role==='owner'}
-function can(p){var c=cur();return !!c&&(c.role==='owner'||!!c['can_'+p])}
-function plan(){return (S.profile&&S.profile.plan)||'free'}
+function can(p){var c=cur();return !!c&&!S.locked[c.id]&&(c.role==='owner'||!!c['can_'+p])}
+function plan(){var p=S.profile;if(!p||p.plan!=='premium')return 'free';if(p.premium_until&&new Date(p.premium_until)<=new Date())return 'free';return 'premium'}
+function premiumUntil(){var p=S.profile;return p&&p.premium_until&&plan()==='premium'?new Date(p.premium_until):null}
+function longDate(d){return d.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}
 var FREE_BIZ=1;
-function teamLimit(){return plan()==='premium'?3:1}
+function teamLimit(){return plan()==='premium'?3:0}
 
 function fe(e){var m=(e&&e.message)||String(e||'');var l=m.toLowerCase();
  if(l.indexOf('invalid login')>-1)return 'The email or password is not right. Check it and try again.';
@@ -86,6 +88,8 @@ async function loadProfile(){var r=await sb.from('profiles').select('*').eq('id'
 async function loadBiz(){
  var m=await sb.from('members').select('*').eq('user_id',S.user.id);if(m.error)throw m.error;
  var ids=m.data.map(function(x){return x.business_id});
+ S.locked={};
+ try{var lk=await sb.rpc('my_locked');(lk.data||[]).forEach(function(x){S.locked[x.business_id]=x.reason})}catch(e){}
  if(!ids.length){S.biz=[];return}
  var b=await sb.from('businesses').select('*').in('id',ids).order('created_at',{ascending:true});if(b.error)throw b.error;
  S.biz=b.data.map(function(x){var mm=m.data.filter(function(y){return y.business_id===x.id})[0];return Object.assign({},x,{role:mm.role,can_record:mm.can_record,can_edit:mm.can_edit,can_delete:mm.can_delete})});
@@ -224,10 +228,10 @@ function vTeam(){
   rows+='<div class="rec"><div class="ico">'+esc(ini(nm))+'</div><div style="min-width:0"><div class="t">'+esc(nm)+(m.user_id===S.user.id?' (you)':'')+'</div><div class="s">'+esc(p.email||'')+'</div></div><div class="amt"><span class="pill '+(m.role==='owner'?'':'rep')+'">'+(m.role==='owner'?'Owner':'Team member')+'</span></div>'+
    '<div class="row2"><div class="chips">'+chip(m,'record','Can add records')+chip(m,'edit','Can edit')+chip(m,'delete','Can delete')+'</div>'+(isOwner()&&m.role!=='owner'?'<button class="btn small danger" data-remove-member="'+m.user_id+'" style="margin-left:auto">Remove access</button>':'')+'</div></div>'});
  S.inv.forEach(function(i){rows+='<div class="rec"><div class="ico owe" style="background:var(--warn-soft);color:var(--warn)">'+svg('users',20)+'</div><div style="min-width:0"><div class="t">'+esc(i.email)+'</div><div class="s">Waiting for them to create an account</div></div><div class="amt"><span class="pill part">Invited</span></div><div class="row2"><button class="btn small" data-share-invite="'+esc(i.email)+'">Copy invite message</button><button class="btn small danger" data-cancel-invite="'+i.id+'">Cancel invite</button></div></div>'});
- var form=isOwner()?(used<lim?'<div class="inv-form"><h3 style="font:700 17px var(--f-display);margin-bottom:12px">Add a team member</h3><div class="field"><label for="invEmail">Their email</label><input class="in" id="invEmail" type="email" autocomplete="off" placeholder="name@example.com"></div>'+
+ var form=isOwner()?(lim===0?'<div class="inv-form"><p class="section-sub">Adding team members is part of Premium. Upgrade to invite your staff and choose what each person can do.</p><div style="margin-top:12px"><button class="btn gold small" data-act="plans" data-f="Adding team members">See Premium</button></div></div>':used<lim?'<div class="inv-form"><h3 style="font:700 17px var(--f-display);margin-bottom:12px">Add a team member</h3><div class="field"><label for="invEmail">Their email</label><input class="in" id="invEmail" type="email" autocomplete="off" placeholder="name@example.com"></div>'+
   '<div class="chips"><label class="check" style="margin:0"><input type="checkbox" id="pRec" checked>Can add records</label><label class="check" style="margin:0"><input type="checkbox" id="pEdit">Can edit</label><label class="check" style="margin:0"><input type="checkbox" id="pDel">Can delete</label></div><div class="err" id="invErr" role="alert"></div><button class="btn small" data-act="invite">Add team member</button></div>'
-  :'<div class="inv-form"><p class="section-sub">You have used '+used+' of '+lim+' team member'+(lim>1?'s':'')+' on the '+(plan()==='premium'?'Premium':'Free')+' plan.</p>'+(plan()==='premium'?'':'<div style="margin-top:12px"><button class="btn gold small" data-act="plans" data-f="Adding more team members">See Premium</button></div>')+'</div>'):'';
- return '<section class="card">'+ttl('users','Team')+'<p class="section-sub">'+(isOwner()?'Choose who can work in this business and what they can do. You can remove access at any time. ('+used+' of '+lim+' team member'+(lim>1?'s':'')+' used)':'This is what you can do in this business.')+'</p><div class="recs">'+rows+'</div>'+form+'</section>'}
+  :'<div class="inv-form"><p class="section-sub">You have used all '+lim+' team members on your Premium plan.</p></div>'):'';
+ return '<section class="card">'+ttl('users','Team')+'<p class="section-sub">'+(isOwner()?'Choose who can work in this business and what they can do. You can remove access at any time.'+(lim>0?' ('+used+' of '+lim+' team members used)':(used>0?' Your team members can look at the records but not change them until you renew Premium.':'')):'This is what you can do in this business.')+'</p><div class="recs">'+rows+'</div>'+form+'</section>'}
 
 function vPrefs(){var w=cur(),own=isOwner();
  var opts=function(o,v){return Object.keys(o).map(function(k){return '<option value="'+k+'" '+(k===v?'selected':'')+'>'+esc(o[k])+'</option>'}).join('')};
@@ -236,7 +240,7 @@ function vPrefs(){var w=cur(),own=isOwner();
   return '<div class="rec"><div class="ico '+(t.kind==='exp'?'out':'')+'">'+svg('trash',20)+'</div><div style="min-width:0"><div class="t">'+esc(name)+'</div><div class="s">'+(t.kind==='exp'?'Expense':'Sale')+' · '+money(amt)+'</div></div><div class="amt"><small>Deleted automatically in '+left+' days</small></div>'+
   '<div class="row2"><button class="btn small" data-restore="'+t.kind+':'+t.d.id+'">Restore</button><button class="btn small danger" data-purge="'+t.kind+':'+t.d.id+'">Delete for good</button></div></div>'}).join('');
  return head('Settings','Your business details, how money and dates look, and the app theme.')+
- '<div class="stack"><section class="card"><div class="plan-top"><div class="grow"><h2 class="section-title ttl"><i class="ci gold">'+svg('crown',20)+'</i>Your plan <span class="pill part" style="font-family:var(--f-body)">'+(plan()==='premium'?'Premium':'Free')+'</span></h2><p class="section-sub">Everyday bookkeeping is free. Premium adds extra tools for growing businesses.</p></div><button class="btn gold small" data-act="plans" data-f="">'+svg('lock',16).replace('<svg','<svg class="lk"')+'See Premium</button></div></section>'+
+ '<div class="stack"><section class="card"><div class="plan-top"><div class="grow"><h2 class="section-title ttl"><i class="ci gold">'+svg('crown',20)+'</i>Your plan <span class="pill part" style="font-family:var(--f-body)">'+(plan()==='premium'?'Premium':'Free')+'</span></h2><p class="section-sub">'+(plan()==='premium'?(premiumUntil()?'Premium is active until '+longDate(premiumUntil())+'.':'Premium is active.'):'Everyday bookkeeping is free. Premium adds extra tools for growing businesses.')+'</p></div><button class="btn gold small" data-act="plans" data-f="">'+svg('lock',16).replace('<svg','<svg class="lk"')+(plan()==='premium'?'Renew or extend':'See Premium')+'</button></div>'+(S.profile&&S.profile.premium_until&&plan()==='free'?'<p class="section-sub" style="margin-top:12px">Your Premium ended on '+longDate(new Date(S.profile.premium_until))+'. Your extra businesses and team members are read-only until you renew. Nothing was deleted.</p>':'')+'</section>'+
  '<section class="card">'+ttl('building','Business profile')+'<div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin:20px 0 18px"><div class="ava" style="width:76px;height:76px;font-size:26px">'+(w.logo_url?'<img alt="" src="'+esc(w.logo_url)+'">':esc(ini(w.name)))+'</div>'+
  (own?'<div><label class="btn ghost small" for="logoIn" style="cursor:pointer">Change picture</label><input id="logoIn" type="file" accept="image/*" hidden><p class="section-sub" style="margin-top:8px">A square picture works best.</p></div>':'')+'</div>'+
  '<div class="field"><label for="bizName">Business name</label><input class="in" id="bizName" value="'+esc(w.name)+'" maxlength="80" '+(own?'':'readonly')+'></div>'+(own?'<button class="btn small" id="saveBiz">Save changes</button>':'<p class="section-sub">Only the owner can change business details.</p>')+'</section>'+
@@ -260,7 +264,8 @@ function chrome(){var w=cur();$('#wsName').textContent=w.name;$('#tbName').textC
 function render(){
  if(!S.user||!cur())return;tick();var pg=route();renderNav(pg);chrome();
  if(!S.ready){$('#view').innerHTML='<div class="skel"></div><div class="skel"></div><div class="skel"></div>';return}
- var y=window.scrollY;$('#view').innerHTML=VIEWS[pg]();window.scrollTo(0,y)}
+ var lockMsg=S.locked[S.bid]?'<div class="msg-warn">'+(S.locked[S.bid]==='business'?'This business is read-only because the owner\'s Premium has ended. Nothing has been deleted.':'Your access to this business is read-only because the owner\'s Premium has ended.')+(isOwner()?' <button class="link-btn" data-act="plans" data-f="">Renew Premium</button>':'')+'</div>':'';
+ var y=window.scrollY;$('#view').innerHTML=lockMsg+VIEWS[pg]();window.scrollTo(0,y)}
 window.addEventListener('hashchange',function(){openMenu(false);if($('#app').hidden)return;render();window.scrollTo(0,0)});
 
 /* ---------- toast and modal ---------- */
@@ -348,12 +353,65 @@ async function createBiz(f){var n=(f.get('n')||'').trim();if(!n)return 'Enter a 
 function newWs(){if(plan()!=='premium'&&S.biz.filter(function(b){return b.created_by===S.user.id}).length>=FREE_BIZ){planModal('Adding another business');return}
  modal('<h2>Create a business</h2><p>It gets its own records, separate from your other businesses.</p>'+bizForm(false)+'<div class="actions">'+cancel+'<button class="btn" type="submit">Create</button></div>',createBiz)}
 
-function planModal(feature){
+var PRICES=null;
+var CODES='AF AL DZ AD AO AG AR AM AU AT AZ BS BH BD BB BY BE BZ BJ BT BO BA BW BR BN BG BF BI CV KH CM CA CF TD CL CN CO KM CG CD CR CI HR CU CY CZ DK DJ DM DO EC EG SV GQ ER EE SZ ET FJ FI FR GA GM GE DE GH GR GD GT GN GW GY HT HN HU IS IN ID IR IQ IE IL IT JM JP JO KZ KE KI XK KW KG LA LV LB LS LR LY LI LT LU MG MW MY MV ML MT MH MR MU MX FM MD MC MN ME MA MZ MM NA NR NP NL NZ NI NE NG KP MK NO OM PK PW PS PA PG PY PE PH PL PT QA RO RU RW KN LC VC WS SM ST SA SN RS SC SL SG SK SI SB SO ZA KR SS ES LK SD SR SE CH SY TW TJ TZ TH TL TG TO TT TN TR TM TV UG UA AE GB US UY UZ VU VA VE VN YE ZM ZW HK MO PR'.split(' ');
+var AFRICA=new Set('DZ AO BJ BW BF BI CV CM CF TD KM CG CD CI DJ EG GQ ER SZ ET GA GM GH GN GW KE LS LR LY MG MW ML MR MU MA MZ NA NE NG RW ST SN SC SL SO ZA SS SD TZ TG TN UG ZM ZW EH'.split(' '));
+function regionOf(c){return c==='NG'?'nigeria':AFRICA.has(c)?'africa':'global'}
+function countryName(c){try{return new Intl.DisplayNames(['en'],{type:'region'}).of(c)||c}catch(e){return c}}
+function countryOptions(sel){var list=CODES.map(function(c){return [c,countryName(c)]}).sort(function(a,b){return a[1]<b[1]?-1:1});
+ list.unshift(list.splice(list.findIndex(function(x){return x[0]==='NG'}),1)[0]);
+ return '<option value="">Choose your country</option>'+list.map(function(x){return '<option value="'+x[0]+'"'+(x[0]===sel?' selected':'')+'>'+esc(x[1])+'</option>'}).join('')}
+function guessCountry(){var out='';try{var tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';if(tz==='Africa/Lagos')return 'NG';
+ (navigator.languages||[navigator.language]).some(function(l){var m=/^[a-z]{2,3}[-_]([A-Za-z]{2})$/.exec(l||'');if(m&&CODES.indexOf(m[1].toUpperCase())>-1){out=m[1].toUpperCase();return true}return false})}catch(e){}return out}
+function priceOf(region,period,method){var cur=(method==='squad'&&region==='nigeria')?'NGN':'USD';var r=(PRICES||[]).filter(function(p){return p.region===region&&p.period===period&&p.currency===cur})[0];return r?{cur:cur,amt:+r.amount}:null}
+function priceTxt(p){return p?(p.cur==='NGN'?'₦':'$')+p.amt.toLocaleString('en'):'Not available'}
+async function planModal(feature){
  var chk=function(t){return '<li>'+svg('check',18)+'<span>'+t+'</span></li>'};
- modal('<h2>LedgiBu Premium</h2><p>'+(feature?esc(feature)+' is part of Premium. ':'')+'Everything you use today stays free.</p>'+
-  '<div class="tier"><h3>Free <small>Always free</small></h3><ul>'+chk('1 business')+chk('Income, expenses, debtors and reports, with no limit on records')+chk('Reports by week, month and year')+chk('Trash, themes, currencies and date formats')+chk('1 team member')+'</ul></div>'+
-  '<div class="tier pro"><h3>Premium <small>Opens after launch</small></h3><ul>'+chk('More than 1 business')+chk('Up to 3 team members, each with their own permissions')+chk('Automatic backup of all your records')+chk('Download reports as PDF or Excel')+'</ul></div>'+
-  '<div class="actions"><button class="btn" type="submit">Got it</button></div>',function(){})}
+ if(!PRICES){var pr=await sb.from('plan_prices').select('*');PRICES=pr.error?[]:(pr.data||[])}
+ var until=premiumUntil(),guess=guessCountry();
+ var intro=until?'Premium is active until '+longDate(until)+'. Pay again to add more time on top.':(feature?esc(feature)+' is part of Premium. ':'')+'Everything you use today stays free.';
+ modal('<h2>LedgiBu Premium</h2><p>'+intro+'</p>'+
+  '<div class="tier pro"><h3>Premium <small>Prepaid, no auto-renewal</small></h3><ul>'+chk('More than 1 business')+chk('Up to 3 team members, each with their own permissions')+'</ul><p class="section-sub" style="margin-top:12px">Coming soon to Premium: automatic backups and PDF or Excel downloads.</p></div>'+
+  '<div class="field"><label for="pRegion">Which country are you paying from?</label><select class="in" id="pRegion" name="country">'+countryOptions(guess)+'</select><small>Prices are lower in Africa. Please choose the country you really pay from.</small></div>'+
+  '<div class="field"><label>How long?</label><div class="seg" role="radiogroup" id="pPeriod"></div></div>'+
+  '<div class="field"><label>How do you want to pay?</label><div class="stack" id="pMethod" style="gap:8px"></div></div>'+
+  '<div class="payline" id="pLine"></div>'+err0+
+  '<div class="actions">'+cancel+'<button class="btn gold" type="submit">Continue to payment</button></div>'+
+  '<p class="section-sub" style="margin-top:14px;font-size:13px">Payments are handled by Squad (naira and cards) and NOWPayments (crypto). We never see your card details. Read the <a href="'+SITE_URL+'terms.html" target="_blank" rel="noopener">Terms</a> for refunds.</p>',
+  async function(f){
+   var q=sel();if(!q.country)return 'Please choose your country.';if(!priceOf(q.region,q.period,q.method))return 'That option is not available for your country yet.';
+   var r=await sb.functions.invoke('checkout',{body:{provider:q.method,country:q.country,period:q.period}});
+   var data=r.data,er=r.error;
+   if(er&&er.context&&er.context.json){try{var j=await er.context.json();if(j&&j.error)return j.error}catch(e){}}
+   if(er)return 'We could not start the payment. Please check your connection and try again.';
+   if(!data||!data.url)return (data&&data.error)||'We could not start the payment. Please try again.';
+   window.location.href=data.url;return});
+ var form=$('#mform'),state={period:'month',method:'squad'};
+ function sel(){var c=$('#pRegion').value;return {country:c,region:c?regionOf(c):'',period:state.period,method:state.method}}
+ function draw(){
+  var c0=$('#pRegion').value,r=c0?regionOf(c0):'';
+  $('#pPeriod').innerHTML=[['month','Monthly'],['year','Yearly']].map(function(k){return '<button type="button" role="radio" data-per="'+k[0]+'" aria-checked="'+(state.period===k[0])+'" aria-pressed="'+(state.period===k[0])+'">'+k[1]+'</button>'}).join('');
+  $('#pMethod').innerHTML=[['squad',r==='nigeria'?'Naira: card, bank transfer or USSD':'Card, in US dollars'],['nowpayments','Crypto or stablecoins']].map(function(k){
+   return '<button type="button" class="ws-card" data-meth="'+k[0]+'" '+(state.method===k[0]?'aria-current="true"':'')+'><div style="min-width:0;text-align:left"><b>'+k[1]+'</b></div><span class="pill'+(state.method===k[0]?'':' part')+'" style="margin-left:auto">'+(r?priceTxt(priceOf(r,state.period,k[0])):'')+'</span></button>'}).join('');
+  var p=r?priceOf(r,state.period,state.method):null;
+  $('#pLine').innerHTML=p?'<b>'+priceTxt(p)+'</b> for '+(state.period==='year'?'12 months':'1 month')+' of Premium'+(p.cur==='USD'&&state.method==='squad'&&r==='nigeria'?'':''):'';
+ }
+ form.addEventListener('click',function(e){var b=e.target.closest('[data-per],[data-meth]');if(!b)return;e.preventDefault();if(b.dataset.per)state.period=b.dataset.per;if(b.dataset.meth)state.method=b.dataset.meth;draw()});
+ $('#pRegion').addEventListener('change',draw);draw()}
+/* coming back from the payment page: ?pay=REFERENCE */
+var PAYREF=(function(){try{var p=new URLSearchParams(location.search).get('pay');if(p){history.replaceState(null,'',location.pathname+location.hash)}return p&&/^[A-Za-z0-9]{6,40}$/.test(p)?p:null}catch(e){return null}})();
+async function payReturn(ref){
+ modal('<h2>Checking your payment</h2><p id="payMsg">One moment while we confirm it with the payment provider.</p><div class="skel" id="paySk" style="height:8px;margin:12px 0"></div><div class="actions"><button class="btn" type="submit">Close</button></div>',function(){});
+ var say=function(t){var m=$('#payMsg');if(m)m.textContent=t};
+ for(var i=0;i<20;i++){
+  var r=await sb.functions.invoke('checkout',{body:{action:'status',reference:ref}});
+  if(!$('#payMsg'))return; // the person closed the window
+  if(r.data&&r.data.status==='paid'){await loadProfile();await loadBiz();render();var sk=$('#paySk');if(sk)sk.remove();var u=premiumUntil();
+   var h=$('#mform h2');if(h)h.textContent='Premium is on';say('Thank you! Your Premium is active'+(u?' until '+longDate(u):'')+'.');return}
+  if(r.data&&r.data.status==='failed'){var sk2=$('#paySk');if(sk2)sk2.remove();say('That payment did not go through, and you have not been charged by LedgiBu. You can try again from Settings.');return}
+  await new Promise(function(res){setTimeout(res,3000)})}
+ var sk3=$('#paySk');if(sk3)sk3.remove();
+ say('We have not received the confirmation yet. Card and bank payments usually take a minute. Crypto can take longer, because the network has to confirm it. Premium switches on by itself once it is confirmed, so you can close this and check Settings later.')}
 function confirmBox(title,text,label,fn){modal('<h2>'+title+'</h2><p>'+text+'</p>'+err0+'<div class="actions">'+cancel+'<button class="btn danger" type="submit">'+label+'</button></div>',fn)}
 
 /* ---------- auth screens ---------- */
@@ -411,6 +469,7 @@ async function boot(){
   if(!S.biz.length){onboard();return}
   S.ready=false;$('#gate').hidden=true;$('#app').hidden=false;render();
   await loadData();showApp();
+  if(PAYREF){var pr0=PAYREF;PAYREF=null;payReturn(pr0)}
  }catch(e){gate(BRAND+'<h2>We could not load your books</h2><p>'+esc(fe(e))+'</p><button class="btn" style="width:100%" id="retry">Try again</button>');$('#retry').onclick=function(){booting=false;boot()}}
  finally{booting=false}}
 
@@ -431,7 +490,7 @@ document.addEventListener('click',async function(e){
  else if(a.act==='invite'){var em=($('#invEmail').value||'').trim().toLowerCase(),er=$('#invErr');er.classList.remove('on');
    if(!/^\S+@\S+\.\S+$/.test(em)){er.textContent='Enter a valid email address.';er.classList.add('on');return}
    el.disabled=true;var ri=await sb.rpc('invite_member',{p_business:S.bid,p_email:em,p_record:$('#pRec').checked,p_edit:$('#pEdit').checked,p_delete:$('#pDel').checked});el.disabled=false;
-   if(ri.error){if(/plan allows/i.test(ri.error.message||'')){planModal('Adding more team members')}else{er.textContent=fe(ri.error);er.classList.add('on')}return}
+   if(ri.error){if(/plan allows|part of Premium/i.test(ri.error.message||'')){planModal('Adding more team members')}else{er.textContent=fe(ri.error);er.classList.add('on')}return}
    await refresh();inviteModal(em,ri.data)}
  else if(a.shareInvite)inviteModal(a.shareInvite,'invited')
  else if(a.editRep){var rp=S.reps.filter(function(y){return y.id===a.editRep})[0];if(rp)repEditModal(rp)}
