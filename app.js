@@ -325,6 +325,7 @@ function inviteModal(email,kind){var msg=inviteMsg(email,kind);
   '<div class="actions"><button class="btn ghost" data-close>Done</button><a class="btn ghost" target="_blank" rel="noopener" href="https://wa.me/?text='+encodeURIComponent(msg)+'">Send on WhatsApp</a><button class="btn" type="button" id="cpy">Copy message</button></div>',function(){});
  $('#im').value=msg;
  $('#cpy').onclick=async function(){try{await navigator.clipboard.writeText(msg);toast('Message copied')}catch(e){var t=$('#im');t.focus();t.select();try{document.execCommand('copy');toast('Message copied')}catch(x){toast('Press and hold the message to copy it')}}}}
+var SITE_URL='https://tesadoy.github.io/ledgibu-site/';
 var FEEDBACK_EMAIL='ledgibu.app@tesadoy.com';
 function feedbackModal(){
  function compose(){var k=$('#fbk').value,m=($('#fbm').value||'').trim();
@@ -362,7 +363,7 @@ function pwField(id,lab,auto){return fld(id,lab,'<input class="in" id="'+id+'" n
 function authScreen(mode,note){
  var h=BRAND;
  if(mode==='in')h+='<h2>Welcome back</h2><p>Sign in to keep your books up to date.</p>'+(note?'<div class="msg-ok">'+esc(note)+'</div>':'')+'<form id="af" data-mode="in" novalidate><div class="err" id="aerr" role="alert"></div>'+fld('ae','Email','<input class="in" id="ae" name="ae" type="email" autocomplete="email" inputmode="email">')+pwField('ap','Password','current-password')+'<button class="btn" style="width:100%" type="submit">Sign in</button></form><div class="auth-links"><button class="link-btn" data-auth="forgot">Forgot password?</button></div><div class="newhere"><span>New to LedgiBu?</span><button class="btn ghost" style="width:100%" data-auth="up">Create your profile</button></div>';
- if(mode==='up')h+='<h2>Create your profile</h2><p>It is free and takes a minute.</p><form id="af" data-mode="up" novalidate><div class="err" id="aerr" role="alert"></div>'+fld('an','Your name','<input class="in" id="an" name="an" autocomplete="name">')+fld('ae','Email','<input class="in" id="ae" name="ae" type="email" autocomplete="email" inputmode="email">')+pwField('ap','Password (at least 8 characters)','new-password')+'<button class="btn" style="width:100%" type="submit">Create my profile</button></form><div class="auth-links"><span>Already have a profile?</span><button class="link-btn" data-auth="in">Sign in</button></div>';
+ if(mode==='up')h+='<h2>Create your profile</h2><p>It is free and takes a minute.</p><form id="af" data-mode="up" novalidate><div class="err" id="aerr" role="alert"></div>'+fld('an','Your name','<input class="in" id="an" name="an" autocomplete="name">')+fld('ae','Email','<input class="in" id="ae" name="ae" type="email" autocomplete="email" inputmode="email">')+pwField('ap','Password (at least 8 characters)','new-password')+'<label class="check agree"><input type="checkbox" name="agree" id="agree"><span>I am 18 or over and agree to the <a href="'+SITE_URL+'terms.html" target="_blank" rel="noopener">Terms of Use</a> and <a href="'+SITE_URL+'privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</span></label><button class="btn" style="width:100%" type="submit">Create my profile</button></form><div class="auth-links"><span>Already have a profile?</span><button class="link-btn" data-auth="in">Sign in</button></div>';
  if(mode==='forgot')h+='<h2>Reset your password</h2><p>Enter your email and we will send you a link.</p><form id="af" data-mode="forgot" novalidate><div class="err" id="aerr" role="alert"></div>'+fld('ae','Email','<input class="in" id="ae" name="ae" type="email" autocomplete="email" inputmode="email">')+'<button class="btn" style="width:100%" type="submit">Send reset link</button></form><div class="auth-links"><button class="link-btn" data-auth="in">Back to sign in</button></div>';
  if(mode==='recover')h+='<h2>Choose a new password</h2><p>Use at least 8 characters.</p><form id="af" data-mode="recover" novalidate><div class="err" id="aerr" role="alert"></div>'+pwField('ap','New password','new-password')+'<button class="btn" style="width:100%" type="submit">Save password</button></form>';
  if(mode==='check')h+='<h2>Check your email</h2><p>'+esc(note)+'</p><button class="btn" style="width:100%" data-auth="in">Back to sign in</button>';
@@ -383,13 +384,13 @@ document.addEventListener('submit',async function(e){var f=e.target;if(f.id!=='a
  var email=val('ae').toLowerCase(),pw=$('#ap')?$('#ap').value:'';er.classList.remove('on');
  var fail=function(m){er.textContent=m;er.classList.add('on');b.disabled=false};
  if(mode!=='recover'&&!/^\S+@\S+\.\S+$/.test(email))return fail('Enter a valid email address.');
- if(mode==='up'){if(!val('an'))return fail('Enter your name.');if(pw.length<8)return fail('Your password needs at least 8 characters.')}
+ if(mode==='up'){if(!val('an'))return fail('Enter your name.');if(pw.length<8)return fail('Your password needs at least 8 characters.');var ag=document.getElementById('agree');if(!ag||!ag.checked)return fail('Please tick the box to agree to the Terms of Use and Privacy Policy.')}
  if(mode==='in'&&!pw)return fail('Enter your password.');
  if(mode==='recover'&&pw.length<8)return fail('Your password needs at least 8 characters.');
  b.disabled=true;
  try{
   if(mode==='in'){var r=await sb.auth.signInWithPassword({email:email,password:pw});if(r.error)return fail(fe(r.error))}
-  else if(mode==='up'){var r2=await sb.auth.signUp({email:email,password:pw,options:{data:{full_name:val('an')},emailRedirectTo:REDIRECT}});if(r2.error)return fail(fe(r2.error));
+  else if(mode==='up'){var r2=await sb.auth.signUp({email:email,password:pw,options:{data:{full_name:val('an'),accepted_terms_at:new Date().toISOString()},emailRedirectTo:REDIRECT}});if(r2.error)return fail(fe(r2.error));
     if(!r2.data.session)authScreen('check','We sent a link to '+email+'. Open it to confirm your email, then come back here and sign in.')}
   else if(mode==='forgot'){var r3=await sb.auth.resetPasswordForEmail(email,{redirectTo:REDIRECT});if(r3.error)return fail(fe(r3.error));authScreen('check','If '+email+' has an account, we sent a link to reset the password. It may take a few minutes to arrive.')}
   else if(mode==='recover'){var r4=await sb.auth.updateUser({password:pw});if(r4.error)return fail(fe(r4.error));history.replaceState(null,'',location.pathname);await boot()}
