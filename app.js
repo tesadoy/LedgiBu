@@ -375,17 +375,13 @@ async function planModal(feature){
   '<div class="field"><label for="pRegion">Which country are you paying from?</label><select class="in" id="pRegion" name="country">'+countryOptions(guess)+'</select><small>Prices are lower in Africa. Please choose the country you really pay from.</small></div>'+
   '<div class="field"><label>How long?</label><div class="seg" role="radiogroup" id="pPeriod"></div></div>'+
   '<div class="field"><label>How do you want to pay?</label><div class="stack" id="pMethod" style="gap:8px"></div></div>'+
-  '<div class="payline" id="pLine"></div>'+err0+
+  '<div class="msg-warn" id="pNote" hidden><b>Before you send crypto:</b> on the next page, choose your coin and check which <b>network</b> it uses (for example TRC20 or BEP20). Send from a wallet on that <b>same network</b>, and send the <b>exact amount</b> shown. Coins sent on the wrong network, or too little, may be lost and will not unlock Premium.</div>'+'<div class="payline" id="pLine"></div>'+err0+
   '<div class="actions">'+cancel+'<button class="btn gold" type="submit">Continue to payment</button></div>'+
   '<p class="section-sub" style="margin-top:14px;font-size:13px">Payments are handled by Squad (naira and cards) and NOWPayments (crypto). We never see your card details. Read the <a href="'+SITE_URL+'terms.html" target="_blank" rel="noopener">Terms</a> for refunds.</p>',
   async function(f){
    var q=sel();if(!q.country)return 'Please choose your country.';if(!priceOf(q.region,q.period,q.method))return 'That option is not available for your country yet.';
-   var r=await sb.functions.invoke('checkout',{body:{provider:q.method,country:q.country,period:q.period}});
-   var data=r.data,er=r.error;
-   if(er&&er.context&&er.context.json){try{var j=await er.context.json();if(j&&j.error)return j.error}catch(e){}}
-   if(er)return 'We could not start the payment. Please check your connection and try again.';
-   if(!data||!data.url)return (data&&data.error)||'We could not start the payment. Please try again.';
-   window.location.href=data.url;return});
+   if(q.method==='nowpayments'){setTimeout(function(){cryptoWarn(q)},0);return}
+   return await startPay(q)});
  var form=$('#mform'),state={period:'month',method:'squad'};
  function sel(){var c=$('#pRegion').value;return {country:c,region:c?regionOf(c):'',period:state.period,method:state.method}}
  function draw(){
@@ -393,11 +389,25 @@ async function planModal(feature){
   $('#pPeriod').innerHTML=[['month','Monthly'],['year','Yearly']].map(function(k){return '<button type="button" role="radio" data-per="'+k[0]+'" aria-checked="'+(state.period===k[0])+'" aria-pressed="'+(state.period===k[0])+'">'+k[1]+'</button>'}).join('');
   $('#pMethod').innerHTML=[['squad',r==='nigeria'?'Naira: card, bank transfer or USSD':'Card, in US dollars'],['nowpayments','Crypto or stablecoins']].map(function(k){
    return '<button type="button" class="ws-card" data-meth="'+k[0]+'" '+(state.method===k[0]?'aria-current="true"':'')+'><div style="min-width:0;text-align:left"><b>'+k[1]+'</b></div><span class="pill'+(state.method===k[0]?'':' part')+'" style="margin-left:auto">'+(r?priceTxt(priceOf(r,state.period,k[0])):'')+'</span></button>'}).join('');
+  var pn=$('#pNote');if(pn)pn.hidden=state.method!=='nowpayments';
   var p=r?priceOf(r,state.period,state.method):null;
   $('#pLine').innerHTML=p?'<b>'+priceTxt(p)+'</b> for '+(state.period==='year'?'12 months':'1 month')+' of Premium'+(p.cur==='USD'&&state.method==='squad'&&r==='nigeria'?'':''):'';
  }
  form.addEventListener('click',function(e){var b=e.target.closest('[data-per],[data-meth]');if(!b)return;e.preventDefault();if(b.dataset.per)state.period=b.dataset.per;if(b.dataset.meth)state.method=b.dataset.meth;draw()});
  $('#pRegion').addEventListener('change',draw);draw()}
+async function startPay(q){
+ var r=await sb.functions.invoke('checkout',{body:{provider:q.method,country:q.country,period:q.period}});
+ var data=r.data,er=r.error;
+ if(er&&er.context&&er.context.json){try{var j=await er.context.json();if(j&&j.error)return j.error}catch(e){}}
+ if(er)return 'We could not start the payment. Please check your connection and try again.';
+ if(!data||!data.url)return (data&&data.error)||'We could not start the payment. Please try again.';
+ window.location.href=data.url}
+function cryptoWarn(q){
+ modal('<h2>Choose the right network</h2><div class="msg-warn"><p><b>Coins sent on the wrong network are lost for good.</b> Neither LedgiBu nor NOWPayments can get them back.</p></div>'+
+  '<p>On the next page you will pick a coin. Many coins, such as USDT, exist on several networks (for example TRC20, BEP20 or ERC20).</p>'+
+  '<ul style="margin:0 0 14px;padding-left:20px;line-height:1.6"><li>Choose the network your wallet or exchange will send on.</li><li>Check that it matches the network shown beside the address.</li></ul>'+err0+
+  '<div class="actions">'+cancel+'<button class="btn gold" type="submit">I understand, continue</button></div>',
+  async function(){return await startPay(q)})}
 /* coming back from the payment page: ?pay=REFERENCE */
 var PAYREF=(function(){try{var p=new URLSearchParams(location.search).get('pay');if(p){history.replaceState(null,'',location.pathname+location.hash)}return p&&/^[A-Za-z0-9]{6,40}$/.test(p)?p:null}catch(e){return null}})();
 async function payReturn(ref){
