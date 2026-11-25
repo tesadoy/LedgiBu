@@ -290,3 +290,5 @@ textarea.in{font-family:inherit;resize:vertical}
 
 .payline{margin:4px 0 16px;padding:14px 16px;border-radius:14px;background:var(--gold-soft);color:var(--ink);font-size:15px}.payline b{font:700 20px var(--f-display)}
 .modal .ws-card{width:100%}
+
+.btn.busy{pointer-events:none;opacity:.85}.btn.busy::before{content:"";width:16px;height:16px;border-radius:50%;border:2.5px solid rgba(43,32,8,.3);border-top-color:#2B2008;animation:spin .8s linear infinite;flex:none}@keyframes spin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.btn.busy::before{animation-duration:2s}}

@@ -353,7 +353,8 @@ async function createBiz(f){var n=(f.get('n')||'').trim();if(!n)return 'Enter a 
 function newWs(){if(plan()!=='premium'&&S.biz.filter(function(b){return b.created_by===S.user.id}).length>=FREE_BIZ){planModal('Adding another business');return}
  modal('<h2>Create a business</h2><p>It gets its own records, separate from your other businesses.</p>'+bizForm(false)+'<div class="actions">'+cancel+'<button class="btn" type="submit">Create</button></div>',createBiz)}
 
-var PRICES=null;
+var PRICES=null,PRICES_P=null;
+function loadPrices(){if(PRICES)return Promise.resolve(PRICES);if(!PRICES_P)PRICES_P=sb.from('plan_prices').select('*').then(function(r){if(r.error){PRICES_P=null;return []}PRICES=r.data||[];return PRICES},function(){PRICES_P=null;return []});return PRICES_P}
 var CODES='AF AL DZ AD AO AG AR AM AU AT AZ BS BH BD BB BY BE BZ BJ BT BO BA BW BR BN BG BF BI CV KH CM CA CF TD CL CN CO KM CG CD CR CI HR CU CY CZ DK DJ DM DO EC EG SV GQ ER EE SZ ET FJ FI FR GA GM GE DE GH GR GD GT GN GW GY HT HN HU IS IN ID IR IQ IE IL IT JM JP JO KZ KE KI XK KW KG LA LV LB LS LR LY LI LT LU MG MW MY MV ML MT MH MR MU MX FM MD MC MN ME MA MZ MM NA NR NP NL NZ NI NE NG KP MK NO OM PK PW PS PA PG PY PE PH PL PT QA RO RU RW KN LC VC WS SM ST SA SN RS SC SL SG SK SI SB SO ZA KR SS ES LK SD SR SE CH SY TW TJ TZ TH TL TG TO TT TN TR TM TV UG UA AE GB US UY UZ VU VA VE VN YE ZM ZW HK MO PR'.split(' ');
 var AFRICA=new Set('DZ AO BJ BW BF BI CV CM CF TD KM CG CD CI DJ EG GQ ER SZ ET GA GM GH GN GW KE LS LR LY MG MW ML MR MU MA MZ NA NE NG RW ST SN SC SL SO ZA SS SD TZ TG TN UG ZM ZW EH'.split(' '));
 function regionOf(c){return c==='NG'?'nigeria':AFRICA.has(c)?'africa':'global'}
@@ -367,7 +368,12 @@ function priceOf(region,period,method){var cur=(method==='squad'&&region==='nige
 function priceTxt(p){return p?(p.cur==='NGN'?'₦':'$')+p.amt.toLocaleString('en'):'Not available'}
 async function planModal(feature){
  var chk=function(t){return '<li>'+svg('check',18)+'<span>'+t+'</span></li>'};
- if(!PRICES){var pr=await sb.from('plan_prices').select('*');PRICES=pr.error?[]:(pr.data||[])}
+ if(!PRICES){
+  modal('<h2>LedgiBu Premium</h2><div id="planLoad" aria-busy="true"><div class="skel" style="height:14px;width:70%;margin:14px 0"></div><div class="skel" style="height:110px;margin:0 0 14px"></div><div class="skel" style="height:44px;margin:0 0 12px"></div><div class="skel" style="height:44px;margin:0 0 12px"></div><div class="skel" style="height:64px"></div></div><div class="actions">'+cancel+'</div>',function(){});
+  await loadPrices();
+  if(!$('#planLoad'))return; // the person closed the window while it loaded
+  if(!PRICES||!PRICES.length){var pl=$('#planLoad');if(pl)pl.innerHTML='<p>We could not load the Premium options. Please check your connection and try again.</p>';return}
+ }
  var until=premiumUntil(),guess=guessCountry();
  var intro=until?'Premium is active until '+longDate(until)+'. Pay again to add more time on top.':(feature?esc(feature)+' is part of Premium. ':'')+'Everything you use today stays free.';
  modal('<h2>LedgiBu Premium</h2><p>'+intro+'</p>'+
@@ -375,13 +381,15 @@ async function planModal(feature){
   '<div class="field"><label for="pRegion">Which country are you paying from?</label><select class="in" id="pRegion" name="country">'+countryOptions(guess)+'</select><small>Prices are lower in Africa. Please choose the country you really pay from.</small></div>'+
   '<div class="field"><label>How long?</label><div class="seg" role="radiogroup" id="pPeriod"></div></div>'+
   '<div class="field"><label>How do you want to pay?</label><div class="stack" id="pMethod" style="gap:8px"></div></div>'+
-  '<div class="msg-warn" id="pNote" hidden><b>Before you send crypto:</b> on the next page, choose your coin and check which <b>network</b> it uses (for example TRC20 or BEP20). Send from a wallet on that <b>same network</b>, and send the <b>exact amount</b> shown. Coins sent on the wrong network, or too little, may be lost and will not unlock Premium.</div>'+'<div class="payline" id="pLine"></div>'+err0+
+  '<div class="payline" id="pLine"></div>'+err0+
   '<div class="actions">'+cancel+'<button class="btn gold" type="submit">Continue to payment</button></div>'+
   '<p class="section-sub" style="margin-top:14px;font-size:13px">Payments are handled by Squad (naira and cards) and NOWPayments (crypto). We never see your card details. Read the <a href="'+SITE_URL+'terms.html" target="_blank" rel="noopener">Terms</a> for refunds.</p>',
   async function(f){
    var q=sel();if(!q.country)return 'Please choose your country.';if(!priceOf(q.region,q.period,q.method))return 'That option is not available for your country yet.';
-   if(q.method==='nowpayments'){setTimeout(function(){cryptoWarn(q)},0);return}
-   return await startPay(q)});
+   var bt=$('#mform [type=submit]'),orig=bt?bt.textContent:'';if(bt){bt.textContent='Opening secure payment page...';bt.classList.add('busy')}
+   var res;try{res=await startPay(q)}catch(e){if(bt){bt.textContent=orig;bt.classList.remove('busy')}throw e}
+   if(res&&bt){bt.textContent=orig;bt.classList.remove('busy')}
+   return res});
  var form=$('#mform'),state={period:'month',method:'squad'};
  function sel(){var c=$('#pRegion').value;return {country:c,region:c?regionOf(c):'',period:state.period,method:state.method}}
  function draw(){
@@ -389,7 +397,6 @@ async function planModal(feature){
   $('#pPeriod').innerHTML=[['month','Monthly'],['year','Yearly']].map(function(k){return '<button type="button" role="radio" data-per="'+k[0]+'" aria-checked="'+(state.period===k[0])+'" aria-pressed="'+(state.period===k[0])+'">'+k[1]+'</button>'}).join('');
   $('#pMethod').innerHTML=[['squad',r==='nigeria'?'Naira: card, bank transfer or USSD':'Card, in US dollars'],['nowpayments','Crypto or stablecoins']].map(function(k){
    return '<button type="button" class="ws-card" data-meth="'+k[0]+'" '+(state.method===k[0]?'aria-current="true"':'')+'><div style="min-width:0;text-align:left"><b>'+k[1]+'</b></div><span class="pill'+(state.method===k[0]?'':' part')+'" style="margin-left:auto">'+(r?priceTxt(priceOf(r,state.period,k[0])):'')+'</span></button>'}).join('');
-  var pn=$('#pNote');if(pn)pn.hidden=state.method!=='nowpayments';
   var p=r?priceOf(r,state.period,state.method):null;
   $('#pLine').innerHTML=p?'<b>'+priceTxt(p)+'</b> for '+(state.period==='year'?'12 months':'1 month')+' of Premium'+(p.cur==='USD'&&state.method==='squad'&&r==='nigeria'?'':''):'';
  }
@@ -402,12 +409,6 @@ async function startPay(q){
  if(er)return 'We could not start the payment. Please check your connection and try again.';
  if(!data||!data.url)return (data&&data.error)||'We could not start the payment. Please try again.';
  window.location.href=data.url}
-function cryptoWarn(q){
- modal('<h2>Choose the right network</h2><div class="msg-warn"><p><b>Coins sent on the wrong network are lost for good.</b> Neither LedgiBu nor NOWPayments can get them back.</p></div>'+
-  '<p>On the next page you will pick a coin. Many coins, such as USDT, exist on several networks (for example TRC20, BEP20 or ERC20).</p>'+
-  '<ul style="margin:0 0 14px;padding-left:20px;line-height:1.6"><li>Choose the network your wallet or exchange will send on.</li><li>Check that it matches the network shown beside the address.</li></ul>'+err0+
-  '<div class="actions">'+cancel+'<button class="btn gold" type="submit">I understand, continue</button></div>',
-  async function(){return await startPay(q)})}
 /* coming back from the payment page: ?pay=REFERENCE */
 var PAYREF=(function(){try{var p=new URLSearchParams(location.search).get('pay');if(p){history.replaceState(null,'',location.pathname+location.hash)}return p&&/^[A-Za-z0-9]{6,40}$/.test(p)?p:null}catch(e){return null}})();
 async function payReturn(ref){
@@ -480,6 +481,7 @@ async function boot(){
   S.ready=false;$('#gate').hidden=true;$('#app').hidden=false;render();
   await loadData();showApp();
   if(PAYREF){var pr0=PAYREF;PAYREF=null;payReturn(pr0)}
+  setTimeout(loadPrices,1200);
  }catch(e){gate(BRAND+'<h2>We could not load your books</h2><p>'+esc(fe(e))+'</p><button class="btn" style="width:100%" id="retry">Try again</button>');$('#retry').onclick=function(){booting=false;boot()}}
  finally{booting=false}}
 
