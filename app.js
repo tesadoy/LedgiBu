@@ -12,13 +12,23 @@ function iso(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'
 function parse(s){var p=String(s).slice(0,10).split('-');return new Date(+p[0],+p[1]-1,+p[2],12)}
 var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 var MONL=['January','February','March','April','May','June','July','August','September','October','November','December'];
-var CUR={NGN:'₦',USD:'$',GBP:'£',EUR:'€',GHS:'GH₵',KES:'KSh ',ZAR:'R ',XOF:'CFA '};
-var CURN={NGN:'Nigerian Naira (₦)',USD:'US Dollar ($)',GBP:'British Pound (£)',EUR:'Euro (€)',GHS:'Ghana Cedi (GH₵)',KES:'Kenyan Shilling (KSh)',ZAR:'South African Rand (R)',XOF:'West African CFA (CFA)'};
+var SYM={NGN:'₦',USD:'$',GBP:'£',EUR:'€',GHS:'GH₵',KES:'KSh ',ZAR:'R ',XOF:'CFA '};
+/* the usual currency of every country in the list (ISO country code : ISO currency code) */
+var C2C=(function(){var o={};'AF:AFN AL:ALL DZ:DZD AD:EUR AO:AOA AG:XCD AR:ARS AM:AMD AU:AUD AT:EUR AZ:AZN BS:BSD BH:BHD BD:BDT BB:BBD BY:BYN BE:EUR BZ:BZD BJ:XOF BT:BTN BO:BOB BA:BAM BW:BWP BR:BRL BN:BND BG:EUR BF:XOF BI:BIF CV:CVE KH:KHR CM:XAF CA:CAD CF:XAF TD:XAF CL:CLP CN:CNY CO:COP KM:KMF CG:XAF CD:CDF CR:CRC CI:XOF HR:EUR CU:CUP CY:EUR CZ:CZK DK:DKK DJ:DJF DM:XCD DO:DOP EC:USD EG:EGP SV:USD GQ:XAF ER:ERN EE:EUR SZ:SZL ET:ETB FJ:FJD FI:EUR FR:EUR GA:XAF GM:GMD GE:GEL DE:EUR GH:GHS GR:EUR GD:XCD GT:GTQ GN:GNF GW:XOF GY:GYD HT:HTG HN:HNL HU:HUF IS:ISK IN:INR ID:IDR IR:IRR IQ:IQD IE:EUR IL:ILS IT:EUR JM:JMD JP:JPY JO:JOD KZ:KZT KE:KES KI:AUD XK:EUR KW:KWD KG:KGS LA:LAK LV:EUR LB:LBP LS:LSL LR:LRD LY:LYD LI:CHF LT:EUR LU:EUR MG:MGA MW:MWK MY:MYR MV:MVR ML:XOF MT:EUR MH:USD MR:MRU MU:MUR MX:MXN FM:USD MD:MDL MC:EUR MN:MNT ME:EUR MA:MAD MZ:MZN MM:MMK NA:NAD NR:AUD NP:NPR NL:EUR NZ:NZD NI:NIO NE:XOF NG:NGN KP:KPW MK:MKD NO:NOK OM:OMR PK:PKR PW:USD PS:ILS PA:PAB PG:PGK PY:PYG PE:PEN PH:PHP PL:PLN PT:EUR QA:QAR RO:RON RU:RUB RW:RWF KN:XCD LC:XCD VC:XCD WS:WST SM:EUR ST:STN SA:SAR SN:XOF RS:RSD SC:SCR SL:SLE SG:SGD SK:EUR SI:EUR SB:SBD SO:SOS ZA:ZAR KR:KRW SS:SSP ES:EUR LK:LKR SD:SDG SR:SRD SE:SEK CH:CHF SY:SYP TW:TWD TJ:TJS TZ:TZS TH:THB TL:USD TG:XOF TO:TOP TT:TTD TN:TND TR:TRY TM:TMT TV:AUD UG:UGX UA:UAH AE:AED GB:GBP US:USD UY:UYU UZ:UZS VU:VUV VA:EUR VE:VES VN:VND YE:YER ZM:ZMW ZW:USD HK:HKD MO:MOP PR:USD'.split(' ').forEach(function(x){var a=x.split(':');o[a[0]]=a[1]});return o})();
+var SYMC={};
+function sym(code){if(SYM[code])return SYM[code];if(SYMC[code])return SYMC[code];var out=code+' ';try{var p=new Intl.NumberFormat('en',{style:'currency',currency:code,currencyDisplay:'narrowSymbol'}).formatToParts(0).filter(function(x){return x.type==='currency'})[0];if(p&&p.value&&!/^[A-Z]{3}$/.test(p.value))out=p.value+(p.value.length>1?' ':'');}catch(e){}SYMC[code]=out;return out}
+var CURN=(function(){var dn=null;try{dn=new Intl.DisplayNames(['en'],{type:'currency'})}catch(e){}var seen={};Object.keys(C2C).forEach(function(k){seen[C2C[k]]=1});Object.keys(SYM).forEach(function(k){seen[k]=1});
+ var list=Object.keys(seen).map(function(c){var n=c;try{n=(dn&&dn.of(c))||c}catch(e){}return [c,n+' ('+sym(c).trim()+')']}).sort(function(a,b){return a[1]<b[1]?-1:1});
+ var o={};['NGN','USD'].forEach(function(c){var f=list.filter(function(x){return x[0]===c})[0];if(f)o[c]=f[1]});list.forEach(function(x){if(!o[x[0]])o[x[0]]=x[1]});return o})();
+/* languages spoken across the countries in the list (the app itself is in English for now) */
+var LANGS=(function(){var o={};'en:English fr:French es:Spanish pt:Portuguese ar:Arabic de:German it:Italian nl:Dutch ru:Russian zh:Chinese yue:Cantonese ja:Japanese ko:Korean hi:Hindi bn:Bengali ur:Urdu fa:Persian tr:Turkish id:Indonesian ms:Malay jv:Javanese su:Sundanese th:Thai vi:Vietnamese fil:Filipino ceb:Cebuano ta:Tamil te:Telugu ne:Nepali si:Sinhala my:Burmese km:Khmer lo:Lao mn:Mongolian bo:Tibetan ug:Uyghur kk:Kazakh uz:Uzbek ky:Kyrgyz tg:Tajik tk:Turkmen az:Azerbaijani hy:Armenian ka:Georgian he:Hebrew ps:Pashto ku:Kurdish sd:Sindhi dv:Dhivehi dz:Dzongkha pl:Polish uk:Ukrainian be:Belarusian cs:Czech sk:Slovak hu:Hungarian ro:Romanian bg:Bulgarian el:Greek sr:Serbian hr:Croatian bs:Bosnian sl:Slovenian mk:Macedonian sq:Albanian et:Estonian lv:Latvian lt:Lithuanian fi:Finnish sv:Swedish da:Danish no:Norwegian is:Icelandic ga:Irish gd:Scottish_Gaelic cy:Welsh mt:Maltese lb:Luxembourgish ca:Catalan ha:Hausa yo:Yoruba ig:Igbo pcm:Nigerian_Pidgin sw:Swahili am:Amharic om:Oromo ti:Tigrinya so:Somali aa:Afar zu:Zulu xh:Xhosa af:Afrikaans st:Southern_Sotho tn:Tswana ss:Swati ve:Venda ts:Tsonga nr:Southern_Ndebele nd:Northern_Ndebele sn:Shona ny:Chichewa mg:Malagasy rw:Kinyarwanda rn:Kirundi ln:Lingala kg:Kongo lu:Luba-Katanga lg:Luganda wo:Wolof ff:Fula bm:Bambara ee:Ewe tw:Twi ak:Akan gaa:Ga dyu:Dyula mos:Mossi sg:Sango zgh:Tamazight kab:Kabyle crs:Seychellois_Creole mfe:Mauritian_Creole kea:Cape_Verdean_Creole ht:Haitian_Creole tet:Tetum qu:Quechua ay:Aymara gn:Guarani mi:Maori sm:Samoan to:Tongan fj:Fijian bi:Bislama tpi:Tok_Pisin mh:Marshallese na:Nauruan'.split(' ').forEach(function(x){var a=x.split(':');o[a[0]]=a[1].replace(/_/g,' ')});return o})();
+function languageOptions(sel){var codes=Object.keys(LANGS).sort(function(a,b){return LANGS[a]<LANGS[b]?-1:1});codes.splice(codes.indexOf('en'),1);codes.unshift('en');
+ return codes.map(function(c){return '<option value="'+c+'"'+(c===sel?' selected':'')+'>'+esc(LANGS[c])+(c==='en'?'':'')+'</option>'}).join('')}
 var DFMT={'DD MMM YYYY':'12 Mar 2026','DD/MM/YYYY':'12/03/2026','MM/DD/YYYY':'03/12/2026'};
 var theme=store.get('lg_theme','system');
-function cc(){var c=cur();return (c&&CUR[c.currency])?c.currency:'NGN'}
-function money(n){var neg=n<0;n=Math.abs(n);return (neg?'-':'')+CUR[cc()]+n.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})}
-function short(n){var a=Math.abs(n),s=CUR[cc()].trim();if(a>=1e6)return s+(n/1e6).toFixed(a>=1e7?0:1)+'M';if(a>=1e3)return s+Math.round(n/1e3)+'k';return s+Math.round(n)}
+function cc(){var c=cur();return (c&&CURN[c.currency])?c.currency:'NGN'}
+function money(n){var neg=n<0;n=Math.abs(n);return (neg?'-':'')+sym(cc())+n.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function short(n){var a=Math.abs(n),s=sym(cc()).trim();if(a>=1e6)return s+(n/1e6).toFixed(a>=1e7?0:1)+'M';if(a>=1e3)return s+Math.round(n/1e3)+'k';return s+Math.round(n)}
 function dstr(v){var d=parse(v),dd=String(d.getDate()).padStart(2,'0'),mm=String(d.getMonth()+1).padStart(2,'0'),f=(cur()&&cur().date_format)||'DD MMM YYYY';
   if(f==='DD/MM/YYYY')return dd+'/'+mm+'/'+d.getFullYear();if(f==='MM/DD/YYYY')return mm+'/'+dd+'/'+d.getFullYear();return d.getDate()+' '+MON[d.getMonth()]+' '+d.getFullYear()}
 function applyTheme(){var r=document.documentElement;if(theme==='system')r.removeAttribute('data-theme');else r.setAttribute('data-theme',theme)}
@@ -244,9 +254,11 @@ function vPrefs(){var w=cur(),own=isOwner();
  '<section class="card">'+ttl('building','Business profile')+'<div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin:20px 0 18px"><div class="ava" style="width:76px;height:76px;font-size:26px">'+(w.logo_url?'<img alt="" src="'+esc(w.logo_url)+'">':esc(ini(w.name)))+'</div>'+
  (own?'<div><label class="btn ghost small" for="logoIn" style="cursor:pointer">Change picture</label><input id="logoIn" type="file" accept="image/*" hidden><p class="section-sub" style="margin-top:8px">A square picture works best.</p></div>':'')+'</div>'+
  '<div class="field"><label for="bizName">Business name</label><input class="in" id="bizName" value="'+esc(w.name)+'" maxlength="80" '+(own?'':'readonly')+'></div>'+(own?'<button class="btn small" id="saveBiz">Save changes</button>':'<p class="section-sub">Only the owner can change business details.</p>')+'</section>'+
- '<section class="card">'+ttl('globe','Preferences')+'<p class="section-sub" style="margin-bottom:20px">Changes apply to every page straight away.</p><div class="row2c"><div class="field"><label for="curSel">Currency</label><select class="in" id="curSel" '+(own?'':'disabled')+'>'+opts(CURN,cc())+'</select></div>'+
- '<div class="field"><label for="dfSel">Date format</label><select class="in" id="dfSel" '+(own?'':'disabled')+'>'+opts(DFMT,w.date_format||'DD MMM YYYY')+'</select></div></div>'+
- '<div class="field"><label for="langSel">Language</label><select class="in" id="langSel"><option>English</option></select><small>More languages will be added later.</small></div></section>'+
+ '<section class="card">'+ttl('globe','Preferences')+'<p class="section-sub" style="margin-bottom:20px">Changes apply to every page straight away.</p><div class="row2c"><div class="field"><label for="ctrySel">Country</label><select class="in" id="ctrySel">'+countryOptions((S.profile&&S.profile.country)||'')+'</select></div>'+
+ '<div class="field"><label for="curSel">Currency</label><select class="in" id="curSel" '+(own?'':'disabled')+'>'+opts(CURN,cc())+'</select></div></div>'+
+ '<div class="row2c"><div class="field"><label for="dfSel">Date format</label><select class="in" id="dfSel" '+(own?'':'disabled')+'>'+opts(DFMT,w.date_format||'DD MMM YYYY')+'</select></div>'+
+ '<div class="field"><label for="langSel">Language</label><select class="in" id="langSel">'+languageOptions((S.profile&&S.profile.language)||'en')+'</select></div></div>'+
+ '<p class="section-sub" style="margin-top:-4px">Picking your country sets the currency for you. You can still choose any currency. LedgiBu is in English for now, and your language choice tells us which translations to add first.</p></section>'+
  vTeam()+
  '<section class="card">'+ttl('palette','Theme')+'<p class="section-sub" style="margin-bottom:18px">Choose how LedgiBu looks on this device.</p><div class="seg" role="group" aria-label="Theme">'+[['light','Light'],['dark','Dark'],['system','Match my device']].map(function(k){return '<button data-theme-set="'+k[0]+'" aria-pressed="'+(theme===k[0])+'">'+k[1]+'</button>'}).join('')+'</div></section>'+
  '<section class="card">'+ttl('chat','Help and feedback')+'<p class="section-sub" style="margin-bottom:16px">Found a problem or have an idea? Tell us, and we will read it.</p><button class="btn ghost small" data-act="feedback">Send feedback</button></section>'+
@@ -345,7 +357,7 @@ function feedbackModal(){
   window.location.href='mailto:'+FEEDBACK_EMAIL+'?subject='+encodeURIComponent(c.subject)+'&body='+encodeURIComponent(c.body)};
  $('#fbCopy').onclick=async function(){var c=compose(),er=$('#merr');if(!c.message){er.textContent='Write your message first.';er.classList.add('on');return}er.classList.remove('on');
   var t='To: '+FEEDBACK_EMAIL+'\nSubject: '+c.subject+'\n\n'+c.body;try{await navigator.clipboard.writeText(t);toast('Message copied')}catch(e){toast('Press and hold your message to copy it')}}}
-function bizForm(first){var opts=Object.keys(CURN).map(function(k){return '<option value="'+k+'">'+esc(CURN[k])+'</option>'}).join('');
+function bizForm(first){var defc=(S.profile&&S.profile.country&&C2C[S.profile.country])||'NGN';var opts=Object.keys(CURN).map(function(k){return '<option value="'+k+'"'+(k===defc?' selected':'')+'>'+esc(CURN[k])+'</option>'}).join('');
  return err0+fld('fn','Business name','<input class="in" id="fn" name="n" maxlength="80" placeholder="'+(first?'For example, Ada Fabrics':'Business name')+'">',first?'Using this for yourself? Call it "My money".':'')+fld('fcur','Currency','<select class="in" id="fcur" name="cur">'+opts+'</select>')}
 async function createBiz(f){var n=(f.get('n')||'').trim();if(!n)return 'Enter a business name.';
  var r=await sb.rpc('create_business',{p_name:n,p_currency:f.get('cur')||'NGN'});if(r.error)return fe(r.error);
@@ -378,17 +390,17 @@ async function planModal(feature){
  var intro=until?'Premium is active until '+longDate(until)+'. Pay again to add more time on top.':(feature?esc(feature)+' is part of Premium. ':'')+'Everything you use today stays free.';
  modal('<h2>LedgiBu Premium</h2><p>'+intro+'</p>'+
   '<div class="tier pro"><h3>Premium <small>Prepaid, no auto-renewal</small></h3><ul>'+chk('More than 1 business')+chk('Up to 3 team members, each with their own permissions')+'</ul><p class="section-sub" style="margin-top:12px">Coming soon to Premium: automatic backups and PDF or Excel downloads.</p></div>'+
-  '<div class="field"><label for="pRegion">Which country are you paying from?</label><select class="in" id="pRegion" name="country">'+countryOptions(guess)+'</select><small>Prices are lower in Africa. Please choose the country you really pay from.</small></div>'+
-  '<div class="field"><label>How long?</label><div class="seg" role="radiogroup" id="pPeriod"></div></div>'+
-  '<div class="field"><label>How do you want to pay?</label><div class="stack" id="pMethod" style="gap:8px"></div></div>'+
+  '<div class="field"><label for="pRegion">Country</label><select class="in" id="pRegion" name="country">'+countryOptions((S.profile&&S.profile.country)||guess)+'</select><small>Please, select your country</small></div>'+
+  '<div class="field"><label>Duration</label><div class="seg" role="radiogroup" id="pPeriod"></div></div>'+
+  '<div class="field"><label>Payment method</label><div class="stack" id="pMethod" style="gap:8px"></div></div>'+
   '<div class="payline" id="pLine"></div>'+err0+
   '<div class="actions">'+cancel+'<button class="btn gold" type="submit">Continue to payment</button></div>'+
-  '<p class="section-sub" style="margin-top:14px;font-size:13px">Payments are handled by Squad (naira and cards) and NOWPayments (crypto). We never see your card details. Read the <a href="'+SITE_URL+'terms.html" target="_blank" rel="noopener">Terms</a> for refunds.</p>',
+  '<p class="section-sub" style="margin-top:14px;font-size:13px">Your card details are always hidden. Read the <a href="'+SITE_URL+'terms.html" target="_blank" rel="noopener">Terms</a> for refunds.</p>',
   async function(f){
    var q=sel();if(!q.country)return 'Please choose your country.';if(!priceOf(q.region,q.period,q.method))return 'That option is not available for your country yet.';
-   var bt=$('#mform [type=submit]'),orig=bt?bt.textContent:'';if(bt){bt.textContent='Opening secure payment page...';bt.classList.add('busy')}
-   var res;try{res=await startPay(q)}catch(e){if(bt){bt.textContent=orig;bt.classList.remove('busy')}throw e}
-   if(res&&bt){bt.textContent=orig;bt.classList.remove('busy')}
+   showBusy('Opening secure payment page...');
+   var res;try{res=await startPay(q)}catch(e){hideBusy();throw e}
+   if(res)hideBusy(); // on success the browser is already leaving for the payment page, so the box stays until then
    return res});
  var form=$('#mform'),state={period:'month',method:'squad'};
  function sel(){var c=$('#pRegion').value;return {country:c,region:c?regionOf(c):'',period:state.period,method:state.method}}
@@ -402,6 +414,10 @@ async function planModal(feature){
  }
  form.addEventListener('click',function(e){var b=e.target.closest('[data-per],[data-meth]');if(!b)return;e.preventDefault();if(b.dataset.per)state.period=b.dataset.per;if(b.dataset.meth)state.method=b.dataset.meth;draw()});
  $('#pRegion').addEventListener('change',draw);draw()}
+function showBusy(text){hideBusy();var d=document.createElement('div');d.id='busy';d.className='busy-wrap';d.setAttribute('role','status');d.setAttribute('aria-live','polite');
+ d.innerHTML='<div class="busy-card"><div class="spin" aria-hidden="true"></div><p>'+esc(text)+'</p></div>';document.body.appendChild(d);setTimeout(hideBusy,20000)}
+function hideBusy(){var d=document.getElementById('busy');if(d)d.remove()}
+window.addEventListener('pageshow',function(e){if(e.persisted)hideBusy()}); // coming back with the Back button
 async function startPay(q){
  var r=await sb.functions.invoke('checkout',{body:{provider:q.method,country:q.country,period:q.period}});
  var data=r.data,er=r.error;
@@ -524,9 +540,20 @@ document.addEventListener('click',async function(e){
 });
 document.addEventListener('change',async function(e){var t=e.target;if(!S.user)return;
  try{
- if(t.id==='curSel'||t.id==='dfSel'){var up=t.id==='curSel'?{currency:t.value}:{date_format:t.value};var r=await sb.from('businesses').update(up).eq('id',S.bid);if(r.error){toast(fe(r.error));render();return}Object.assign(cur(),up);render()}
+ if(t.id==='ctrySel'){await pickCountry(t.value)}
+ else if(t.id==='langSel'){var rl=await sb.from('profiles').update({language:t.value}).eq('id',S.user.id);if(rl.error){toast(fe(rl.error));render();return}S.profile.language=t.value;toast(t.value==='en'?'Language saved':'Saved. LedgiBu is in English for now, and we will switch when your language is ready.')}
+ else if(t.id==='curSel'||t.id==='dfSel'){var up=t.id==='curSel'?{currency:t.value}:{date_format:t.value};var r=await sb.from('businesses').update(up).eq('id',S.bid);if(r.error){toast(fe(r.error));render();return}Object.assign(cur(),up);render()}
  else if(t.id==='logoIn'&&t.files[0]){var url=await shrink(t.files[0]);var r2=await sb.from('businesses').update({logo_url:url}).eq('id',S.bid);if(r2.error)return toast(fe(r2.error));cur().logo_url=url;toast('Picture updated');render()}
  }catch(err){toast(fe(err))}});
+async function pickCountry(code){
+ var rp=await sb.from('profiles').update({country:code||null}).eq('id',S.user.id);if(rp.error){toast(fe(rp.error));render();return}
+ S.profile.country=code||null;
+ var c=cur(),want=code&&C2C[code];
+ if(!want||!c||!isOwner()||want===cc()){toast(want&&c&&!isOwner()?'Country saved. Only the owner can change the business currency.':'Country saved');render();return}
+ var apply=async function(){var r=await sb.from('businesses').update({currency:want}).eq('id',S.bid);if(r.error)return fe(r.error);c.currency=want;toast('Currency set to '+CURN[want]);render()};
+ if(S.sales.length+S.exps.length===0){await apply();return}
+ render();
+ modal('<h2>Change the currency too?</h2><p>For '+esc(countryName(code))+' the usual currency is <b>'+esc(CURN[want])+'</b>. Your recorded amounts will not be converted. Only the symbol changes.</p>'+err0+'<div class="actions"><button class="btn ghost" data-close>Keep '+esc(sym(cc()).trim())+'</button><button class="btn" type="submit">Change currency</button></div>',apply)}
 function shrink(file){return new Promise(function(res,rej){var fr=new FileReader();fr.onerror=function(){rej(new Error('Could not read that picture.'))};fr.onload=function(){var im=new Image();im.onerror=function(){rej(new Error('That file is not a picture.'))};im.onload=function(){var s=160,c=document.createElement('canvas');c.width=c.height=s;var x=c.getContext('2d'),m=Math.min(im.width,im.height);x.drawImage(im,(im.width-m)/2,(im.height-m)/2,m,m,0,0,s,s);res(c.toDataURL('image/jpeg',.82))};im.src=fr.result};fr.readAsDataURL(file)})}
 $('#menuBtn').onclick=function(){openMenu(true)};$('#scrim').onclick=function(){openMenu(false)};
 document.addEventListener('keydown',function(e){if(e.key==='Escape'){close();openMenu(false)}});

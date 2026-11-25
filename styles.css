@@ -291,4 +291,9 @@ textarea.in{font-family:inherit;resize:vertical}
 .payline{margin:4px 0 16px;padding:14px 16px;border-radius:14px;background:var(--gold-soft);color:var(--ink);font-size:15px}.payline b{font:700 20px var(--f-display)}
 .modal .ws-card{width:100%}
 
-.btn.busy{pointer-events:none;opacity:.85}.btn.busy::before{content:"";width:16px;height:16px;border-radius:50%;border:2.5px solid rgba(43,32,8,.3);border-top-color:#2B2008;animation:spin .8s linear infinite;flex:none}@keyframes spin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.btn.busy::before{animation-duration:2s}}
+.busy-wrap{position:fixed;inset:0;z-index:300;display:grid;place-items:center;padding:20px;background:color-mix(in srgb,var(--ink) 28%,transparent);-webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px);animation:busyin .18s ease-out}
+.busy-card{width:min(230px,72vw);aspect-ratio:1;border-radius:28px;background:var(--surface);color:var(--ink);box-shadow:0 30px 60px -20px rgba(0,0,0,.45),0 0 0 1px var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:22px;text-align:center}
+.busy-card p{margin:0;font-weight:600;font-size:15.5px;line-height:1.35}
+.spin{width:44px;height:44px;border-radius:50%;border:4px solid var(--line);border-top-color:var(--gold);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}@keyframes busyin{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:2.4s}.busy-wrap{animation:none}}
