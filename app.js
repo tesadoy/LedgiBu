@@ -112,7 +112,7 @@ async function loadData(){
    sb.from('members').select('*').eq('business_id',id),sb.from('invites').select('*').eq('business_id',id)]);
  if(tok!==S.tok)return;
  S.sales=[];S.tSales=[];S.exps=[];S.tExps=[];S.reps=[];S.alloc={};
- res[0].forEach(function(r){var o={id:r.id,date:r.sale_date,cust:r.customer,item:r.item,price:+r.price,paid:+r.paid,del:r.deleted_at};(r.deleted_at?S.tSales:S.sales).push(o)});
+ res[0].forEach(function(r){var o={id:r.id,date:r.sale_date,cust:r.customer,item:r.item,price:+r.price,paid:+r.paid,contact:r.contact||'',del:r.deleted_at};(r.deleted_at?S.tSales:S.sales).push(o)});
  res[1].forEach(function(r){var o={id:r.id,date:r.exp_date,what:r.what,cat:r.category,amount:+r.amount,del:r.deleted_at};(r.deleted_at?S.tExps:S.exps).push(o)});
  res[2].forEach(function(r){S.reps.push({id:r.id,date:r.pay_date,cust:r.customer,amount:+r.amount})});
  res[3].forEach(function(r){S.alloc[r.sale_id]=(S.alloc[r.sale_id]||0)+(+r.amount)});
@@ -126,6 +126,7 @@ async function refresh(){await loadData();render()}
 /* ---------- calculations ---------- */
 function saleAlloc(s){return S.alloc[s.id]||0}
 function saleBal(s){return Math.round((s.price-s.paid-saleAlloc(s))*100)/100}
+function catName(c){return c==='Stock'?'Goods for resale':c}
 function owedBy(c){return sum(S.sales.filter(function(s){return s.cust===c}),saleBal)}
 function inRange(d,a,b){return d>=a&&d<b}
 function metrics(a,b){
@@ -162,10 +163,11 @@ function saleRec(s,tools){var bal=saleBal(s),paid=s.price-bal,pc=Math.round(paid
  return '<div class="rec"><div class="ico '+(bal>0?'owe':'')+'">'+esc(ini(s.cust))+'</div><div style="min-width:0"><div class="t">'+esc(s.cust)+'</div><div class="s">'+esc(s.item)+' · '+dstr(s.date)+'</div></div>'+
   '<div class="amt">'+money(s.price)+'<small>Sale price</small></div><div class="row2">'+st+'<div class="bar" aria-hidden="true"><i style="width:'+pc+'%"></i></div><span class="s'+(bal>0?' red':'')+'">'+(bal>0?money(bal)+' still owed':'Received '+money(paid))+'</span>'+btns+'</div></div>'}
 function expRec(e){var btns='';if(can('edit'))btns+='<button class="icon-btn" data-edit-exp="'+e.id+'" aria-label="Edit expense">'+svg('edit',18)+'</button>';if(can('delete'))btns+='<button class="icon-btn" data-del-exp="'+e.id+'" aria-label="Move to trash">'+svg('trash',18)+'</button>';
- return '<div class="rec"><div class="ico out">'+svg('out',20)+'</div><div style="min-width:0"><div class="t">'+esc(e.what)+'</div><div class="s">'+esc(e.cat)+' · '+dstr(e.date)+'</div></div><div class="amt red">'+money(e.amount)+'</div>'+(btns?'<div class="row2">'+btns+'</div>':'')+'</div>'}
+ return '<div class="rec"><div class="ico out">'+svg('out',20)+'</div><div style="min-width:0"><div class="t">'+esc(e.what)+'</div><div class="s">'+esc(catName(e.cat))+' · '+dstr(e.date)+'</div></div><div class="amt red">'+money(e.amount)+'</div>'+(btns?'<div class="row2">'+btns+'</div>':'')+'</div>'}
 function repRec(r){return '<div class="rec"><div class="ico">'+svg('in',20)+'</div><div style="min-width:0"><div class="t">'+esc(r.cust)+'</div><div class="s">Repayment · '+dstr(r.date)+'</div></div><div class="amt">'+money(r.amount)+'</div><div class="row2"><span class="pill rep">Repayment</span><span class="s">Cleared the oldest debt first</span>'+(can('edit')?'<button class="icon-btn" data-edit-rep="'+r.id+'" aria-label="Edit payment">'+svg('edit',18)+'</button>':'')+'</div></div>'}
+function ctOf(d){var l=d.list.filter(function(x){return x.contact}).sort(function(a,b){return a.date<b.date?1:-1})[0];return l?l.contact:''}
 function debtRec(d){var paid=d.total-d.owed,pc=Math.round(paid/d.total*100);var oldest=d.list.slice().sort(function(a,b){return a.date<b.date?-1:1})[0].date;
- return '<div class="rec"><div class="ico owe">'+esc(ini(d.name))+'</div><div style="min-width:0"><div class="t">'+esc(d.name)+'</div><div class="s">'+d.list.length+' unpaid '+(d.list.length>1?'sales':'sale')+' · oldest '+dstr(oldest)+'</div></div>'+
+ return '<div class="rec"><div class="ico owe">'+esc(ini(d.name))+'</div><div style="min-width:0"><div class="t">'+esc(d.name)+'</div><div class="s">'+d.list.length+' unpaid '+(d.list.length>1?'sales':'sale')+' · oldest '+dstr(oldest)+'</div>'+(ctOf(d)?'<div class="s">'+esc(ctOf(d))+'</div>':'')+'</div>'+
   '<div class="amt red">'+money(d.owed)+'<small>still owed</small></div><div class="row2"><div class="bar" aria-hidden="true"><i style="width:'+pc+'%"></i></div><span class="s">Paid '+pc+'% of '+money(d.total)+'</span>'+(can('record')?'<button class="btn small" data-act="repay" data-c="'+esc(d.name)+'">Receive payment</button>':'')+'</div></div>'}
 
 function chart(){
@@ -225,9 +227,50 @@ function vReports(){var all=metrics(ALL[0],ALL[1]),owed=sum(debtors(),function(d
  return head('Reports','All-time totals, plus any financial week, month or year you choose. Weeks start on Monday.')+
  '<div class="stack"><div class="grid g3">'+statCard('Sales value',money(all.sales),'Everything you have sold')+statCard('Income received',money(all.recv),'Paid at sale plus repayments','gold')+statCard('Expenses',money(all.out),'All money out','terra')+
  statCard('Outstanding',money(owed),'Still to be paid by customers','bad')+statCard('Net cash position',money(all.net),'Income received minus expenses')+'</div>'+
- '<section class="card"><div class="plan-top"><div class="grow">'+ttl('calendar','Pick a period')+'</div>'+lockBtn('Download report','Downloading reports as PDF or Excel')+'</div><div class="period gap-t"><div class="seg" role="group" aria-label="Report period">'+['week','month','year'].map(function(k){return '<button data-rt="'+k+'" aria-pressed="'+(rep.type===k)+'">'+k[0].toUpperCase()+k.slice(1)+'</button>'}).join('')+'</div></div>'+
+ '<section class="card"><div class="plan-top"><div class="grow">'+ttl('calendar','Pick a period')+'</div>'+(plan()==='premium'?'<div class="dlbtns"><button class="btn ghost small" data-dl="pdf">'+svg('out',16)+'PDF</button><button class="btn ghost small" data-dl="xlsx">'+svg('out',16)+'Excel</button></div>':lockBtn('Download report','Downloading reports as PDF or Excel'))+'</div><div class="period gap-t"><div class="seg" role="group" aria-label="Report period">'+['week','month','year'].map(function(k){return '<button data-rt="'+k+'" aria-pressed="'+(rep.type===k)+'">'+k[0].toUpperCase()+k.slice(1)+'</button>'}).join('')+'</div></div>'+
  '<div class="period gap-t"><button class="icon-btn" data-ro="-1" aria-label="Earlier '+label+'">'+svg('left')+'</button><div class="lbl" style="text-align:center">'+r.lbl+'</div><button class="icon-btn" data-ro="1" aria-label="Later '+label+'" '+(rep.off>=0?'disabled style="opacity:.35"':'')+'>'+svg('right')+'</button></div>'+
  '<div class="gap-t">'+[['Sales made',money(m.sales)],['Received when sold',money(m.atSale)],['Repayments received',money(m.rep)],['Total money received',money(m.recv)],['Money out','<span class="neg">'+money(m.out)+'</span>'],['Net cash for this '+(rep.type==='week'?'week':rep.type),'<span class="'+(m.net<0?'neg':'')+'">'+money(m.net)+'</span>']].map(function(k){return '<div class="kv"><span>'+k[0]+'</span><b>'+k[1]+'</b></div>'}).join('')+'</div></section></div>'}
+
+/* ---------- report downloads (Premium) ---------- */
+var LIBS={};
+function loadLib(src){return LIBS[src]||(LIBS[src]=new Promise(function(ok,no){var t=document.createElement('script');t.src=src;t.onload=ok;t.onerror=function(){delete LIBS[src];no(new Error('Could not load the download tools. Check your internet and try again.'))};document.head.appendChild(t)}))}
+function reportData(){var r=range(),m=metrics(r.a,r.b),cu=cc();
+ var sales=S.sales.filter(function(x){return inRange(x.date,r.a,r.b)}).sort(function(a,b){return a.date<b.date?-1:1});
+ var exps=S.exps.filter(function(x){return inRange(x.date,r.a,r.b)}).sort(function(a,b){return a.date<b.date?-1:1});
+ var reps=S.reps.filter(function(x){return inRange(x.date,r.a,r.b)}).sort(function(a,b){return a.date<b.date?-1:1});
+ return {r:r,m:m,cu:cu,sales:sales,exps:exps,reps:reps,debt:debtors(),biz:cur().name,
+  summary:[['Sales made',m.sales],['Received when sold',m.atSale],['Repayments received',m.rep],['Total money received',m.recv],['Money out',m.out],['Net cash',m.net]]}}
+function fileBase(d){return ('LedgiBu '+d.biz+' '+d.r.lbl).replace(/[^A-Za-z0-9 _-]+/g,'').trim().replace(/\s+/g,'-')}
+function saveBlob(blob,name){var u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){a.remove();URL.revokeObjectURL(u)},1500)}
+async function downloadReport(kind){
+ if(plan()!=='premium'){planModal('Downloading reports as PDF or Excel');return}
+ showBusy('Preparing your '+(kind==='pdf'?'PDF':'Excel')+' report...');
+ try{var d=reportData();
+  if(kind==='xlsx'){await loadLib('vendor/xlsx.js');var X=window.XLSX,wb=X.utils.book_new(),n=function(v){return Math.round(v*100)/100};
+   var add=function(name,rows,w){var ws=X.utils.aoa_to_sheet(rows);ws['!cols']=w.map(function(c){return {wch:c}});X.utils.book_append_sheet(wb,ws,name)};
+   add('Summary',[[d.biz],['Report',d.r.lbl],['Currency',d.cu],['Created',dstr(iso(NOW))],[],['Item','Amount ('+d.cu+')']].concat(d.summary.map(function(k){return [k[0],n(k[1])]})),[28,24]);
+   add('Income',[['Date','Customer','What was sold','Price','Received when sold','Still owed now']].concat(d.sales.map(function(x){return [dstr(x.date),x.cust,x.item,n(x.price),n(x.paid),n(saleBal(x))]})),[14,24,30,14,18,16]);
+   add('Expenses',[['Date','What it was for','Type','Amount']].concat(d.exps.map(function(x){return [dstr(x.date),x.what,catName(x.cat),n(x.amount)]})),[14,32,18,14]);
+   add('Repayments',[['Date','Customer','Amount']].concat(d.reps.map(function(x){return [dstr(x.date),x.cust,n(x.amount)]})),[14,28,14]);
+   add('My Debtors',[['Customer','Contact','Total sold','Still owed']].concat(d.debt.map(function(x){return [x.name,ctOf(x),n(x.total),n(x.owed)]})),[26,24,14,14]);
+   var out=X.write(wb,{bookType:'xlsx',type:'array'});saveBlob(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),fileBase(d)+'.xlsx')}
+  else{await loadLib('vendor/jspdf.js');await loadLib('vendor/autotable.js');var J=window.jspdf.jsPDF,doc=new J({unit:'pt',format:'a4'}),W=doc.internal.pageSize.getWidth();
+   var f=function(v){return d.cu+' '+v.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})};
+   doc.setFillColor(15,61,46);doc.rect(0,0,W,86,'F');doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(20);doc.text(d.biz,40,42);
+   doc.setFont('helvetica','normal');doc.setFontSize(11);doc.text('Report: '+d.r.lbl+'   |   Created '+dstr(iso(NOW)),40,64);
+   var y=110,head={fillColor:[15,61,46],textColor:255},sec=function(t){doc.setTextColor(15,61,46);doc.setFont('helvetica','bold');doc.setFontSize(13);doc.text(t,40,y);y+=8};
+   var tbl=function(t,cols,rows,right,empty){sec(t);if(!rows.length){doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(110);y+=14;doc.text(empty,40,y);y+=26;return}
+    var cs={};right.forEach(function(i){cs[i]={halign:'right'}});
+    doc.autoTable({startY:y,head:[cols],body:rows,theme:'striped',headStyles:head,styles:{fontSize:9,cellPadding:5},columnStyles:cs,margin:{left:40,right:40}});y=doc.lastAutoTable.finalY+26};
+   tbl('Summary',['Item','Amount'],d.summary.map(function(k){return [k[0],f(k[1])]}),[1],'');
+   tbl('Income',['Date','Customer','What was sold','Price','Received','Still owed'],d.sales.map(function(x){return [dstr(x.date),x.cust,x.item,f(x.price),f(x.paid),f(saleBal(x))]}),[3,4,5],'No sales in this period.');
+   tbl('Expenses',['Date','What it was for','Type','Amount'],d.exps.map(function(x){return [dstr(x.date),x.what,catName(x.cat),f(x.amount)]}),[3],'No expenses in this period.');
+   tbl('Repayments received',['Date','Customer','Amount'],d.reps.map(function(x){return [dstr(x.date),x.cust,f(x.amount)]}),[2],'No repayments in this period.');
+   tbl('My Debtors (right now)',['Customer','Contact','Total sold','Still owed'],d.debt.map(function(x){return [x.name,ctOf(x),f(x.total),f(x.owed)]}),[2,3],'Nobody owes you right now.');
+   var pg=doc.internal.getNumberOfPages();for(var i=1;i<=pg;i++){doc.setPage(i);doc.setFontSize(8);doc.setTextColor(130);doc.text('Made with LedgiBu',40,doc.internal.pageSize.getHeight()-20);doc.text('Page '+i+' of '+pg,W-40,doc.internal.pageSize.getHeight()-20,{align:'right'})}
+   saveBlob(doc.output('blob'),fileBase(d)+'.pdf')}
+  hideBusy();toast('Report downloaded')}
+ catch(e){hideBusy();toast(e&&e.message?e.message:'Could not create the report')}}
 
 function vTeam(){
  var c=cur(),rows='',used=S.mem.filter(function(m){return m.role!=='owner'}).length+S.inv.length,lim=teamLimit();
@@ -257,12 +300,11 @@ function vPrefs(){var w=cur(),own=isOwner();
  '<section class="card">'+ttl('globe','Preferences')+'<p class="section-sub" style="margin-bottom:20px">Changes apply to every page straight away.</p><div class="row2c"><div class="field"><label for="ctrySel">Country</label><select class="in" id="ctrySel">'+countryOptions((S.profile&&S.profile.country)||'')+'</select></div>'+
  '<div class="field"><label for="curSel">Currency</label><select class="in" id="curSel" '+(own?'':'disabled')+'>'+opts(CURN,cc())+'</select></div></div>'+
  '<div class="row2c"><div class="field"><label for="dfSel">Date format</label><select class="in" id="dfSel" '+(own?'':'disabled')+'>'+opts(DFMT,w.date_format||'DD MMM YYYY')+'</select></div>'+
- '<div class="field"><label for="langSel">Language</label><select class="in" id="langSel">'+languageOptions((S.profile&&S.profile.language)||'en')+'</select></div></div>'+
- '<p class="section-sub" style="margin-top:-4px">Picking your country sets the currency for you. You can still choose any currency. LedgiBu is in English for now, and your language choice tells us which translations to add first.</p></section>'+
+ '<div class="field"><label for="langSel">Language</label><select class="in" id="langSel">'+languageOptions((S.profile&&S.profile.language)||'en')+'</select></div></div></section>'+
  vTeam()+
  '<section class="card">'+ttl('palette','Theme')+'<p class="section-sub" style="margin-bottom:18px">Choose how LedgiBu looks on this device.</p><div class="seg" role="group" aria-label="Theme">'+[['light','Light'],['dark','Dark'],['system','Match my device']].map(function(k){return '<button data-theme-set="'+k[0]+'" aria-pressed="'+(theme===k[0])+'">'+k[1]+'</button>'}).join('')+'</div></section>'+
  '<section class="card">'+ttl('chat','Help and feedback')+'<p class="section-sub" style="margin-bottom:16px">Found a problem or have an idea? Tell us, and we will read it.</p><button class="btn ghost small" data-act="feedback">Send feedback</button></section>'+
- '<section class="card">'+ttl('users','Your account')+'<div class="kv"><span>Name</span><b>'+esc((S.profile&&S.profile.full_name)||'')+'</b></div><div class="kv"><span>Email</span><b style="overflow-wrap:anywhere">'+esc(S.user.email)+'</b></div><div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn ghost small" data-act="pwreset">Email me a password reset link</button><button class="btn ghost small" id="logoutBtn">Log out</button></div></section>'+
+ '<section class="card">'+ttl('users','Your account')+'<div class="kv"><span>Name</span><b>'+esc((S.profile&&S.profile.full_name)||'')+'</b></div><div class="kv"><span>Email</span><b style="overflow-wrap:anywhere">'+esc(S.user.email)+'</b></div><div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn ghost small" data-act="pwreset">Email me a password reset link</button><button class="btn ghost small" id="logoutBtn">Log out</button></div>'+(S.biz.some(function(x){return x.role==='owner'})?'<div class="danger-zone"><h3>Delete account</h3><p class="section-sub">Permanently remove your account and all your business data.</p><button class="btn danger small" id="delAcctBtn">Delete account</button></div>':'')+'</section>'+
  (can('delete')?'<section class="card">'+ttl('trash','Trash','red')+'<p class="section-sub">Deleted items stay here for 30 days. Restore them or delete them for good.</p><div class="recs">'+(tr||empty('Trash is empty','Items you delete will wait here for 30 days.'))+'</div></section>':'')+'</div>'}
 
 function vWorkspaces(){
@@ -300,18 +342,21 @@ function saleModal(debtorMode,ed){
   fld('fc','Customer name','<input class="in" id="fc" name="c" list="cl" autocomplete="off" value="'+esc(ed?ed.cust:'')+'" '+(lockName?'readonly':'')+'><datalist id="cl">'+names.map(function(n){return '<option value="'+esc(n)+'">'}).join('')+'</datalist>',lockName?'The name is locked because this customer has already made repayments.':'')+
   fld('fi','What was sold','<input class="in" id="fi" name="i" placeholder="For example, 4 office desks" value="'+esc(ed?ed.item:'')+'">')+
   '<div class="row2c">'+fld('fp','Sale price','<input class="in" id="fp" name="p" inputmode="decimal" placeholder="0.00" value="'+(ed?ed.price:'')+'">','The full amount charged.')+fld('fa',debtorMode?'Paid so far':'Amount received','<input class="in" id="fa" name="a" inputmode="decimal" placeholder="0.00" value="'+(ed?ed.paid:debtorMode?'0':'')+'">','Less than the price? They owe the rest.')+'</div>'+
+  '<div id="ctWrap" '+(ed&&ed.paid<ed.price?'':'hidden')+'>'+fld('fct','Customer phone or email (optional)','<input class="in" id="fct" name="ct" autocomplete="off" maxlength="80" placeholder="So you can reach them about the balance" value="'+esc(ed?ed.contact:'')+'">')+'</div>'+
   fld('fd','Date','<input class="in" id="fd" name="d" type="date" value="'+(ed?ed.date:iso(NOW))+'">')+'<div class="actions">'+cancel+'<button class="btn" type="submit">Save</button></div>',
   async function(f){var c=(f.get('c')||'').trim(),i=(f.get('i')||'').trim(),p=num(f.get('p')),a=f.get('a')===''?p:num(f.get('a'));
    if(!c)return 'Enter the customer name.';if(!i)return 'Enter what was sold.';if(!(p>0))return 'Enter the sale price.';if(isNaN(a)||a<0)return 'Enter the amount received, or 0 if nothing was paid.';
    if(a>p)return 'The amount received cannot be more than the sale price of '+money(p)+'.';if(debtorMode&&!ed&&a>=p)return 'This customer has paid in full, so they are not a debtor. Use Record income instead.';
-   var row={sale_date:f.get('d')||iso(NOW),customer:c,item:i,price:p,paid:a},r;
+   var row={sale_date:f.get('d')||iso(NOW),customer:c,item:i,price:p,paid:a,contact:a<p?((f.get('ct')||'').trim()||null):null},r;
    if(ed)r=await sb.from('sales').update(row).eq('id',ed.id);else r=await sb.from('sales').insert(Object.assign({business_id:S.bid},row));
    if(r.error)return fe(r.error);
-   toast(ed?'Sale updated':a<p?c+' added to My Debtors':'Income saved');await refresh()})}
+   toast(ed?'Sale updated':a<p?c+' added to My Debtors':'Income saved');await refresh()});
+ var syncCt=function(){var w=$('#ctWrap');if(w)w.hidden=!(num($('#fp').value)>0&&num($('#fa').value||$('#fp').value)<num($('#fp').value))};
+ ['#fp','#fa'].forEach(function(q){var el=$(q);if(el)el.addEventListener('input',syncCt)});syncCt()}
 
 function expModal(ed){modal('<h2>'+(ed?'Edit expense':'Record expense')+'</h2><p>'+(ed?'Fix a mistake in this expense.':'Money the business spent.')+'</p>'+err0+
   fld('fw','What was it for','<input class="in" id="fw" name="w" placeholder="For example, Shop rent" value="'+esc(ed?ed.what:'')+'">')+
-  '<div class="row2c">'+fld('fm','Amount','<input class="in" id="fm" name="m" inputmode="decimal" placeholder="0.00" value="'+(ed?ed.amount:'')+'">')+fld('fk','Type','<select class="in" id="fk" name="k">'+['Stock','Rent','Salaries','Transport','Bills','Other'].map(function(x){return '<option'+(ed&&ed.cat===x?' selected':'')+'>'+x+'</option>'}).join('')+'</select>')+'</div>'+
+  '<div class="row2c">'+fld('fm','Amount','<input class="in" id="fm" name="m" inputmode="decimal" placeholder="0.00" value="'+(ed?ed.amount:'')+'">')+fld('fk','Type','<select class="in" id="fk" name="k">'+['Goods for resale','Rent','Salaries','Transport','Bills','Other'].map(function(x){return '<option'+(ed&&catName(ed.cat)===x?' selected':'')+'>'+x+'</option>'}).join('')+'</select>')+'</div>'+
   fld('fd','Date','<input class="in" id="fd" name="d" type="date" value="'+(ed?ed.date:iso(NOW))+'">')+'<div class="actions">'+cancel+'<button class="btn" type="submit">Save</button></div>',
   async function(f){var w=(f.get('w')||'').trim(),m=num(f.get('m'));if(!w)return 'Enter what the money was spent on.';if(!(m>0))return 'Enter the amount.';
    var row={exp_date:f.get('d')||iso(NOW),what:w,category:f.get('k'),amount:m},r;
@@ -389,7 +434,7 @@ async function planModal(feature){
  var until=premiumUntil(),guess=guessCountry();
  var intro=until?'Premium is active until '+longDate(until)+'. Pay again to add more time on top.':(feature?esc(feature)+' is part of Premium. ':'')+'Everything you use today stays free.';
  modal('<h2>LedgiBu Premium</h2><p>'+intro+'</p>'+
-  '<div class="tier pro"><h3>Premium <small>Prepaid, no auto-renewal</small></h3><ul>'+chk('More than 1 business')+chk('Up to 3 team members, each with their own permissions')+'</ul><p class="section-sub" style="margin-top:12px">Coming soon to Premium: automatic backups and PDF or Excel downloads.</p></div>'+
+  '<div class="tier pro"><h3>Premium <small>Prepaid, no auto-renewal</small></h3><ul>'+chk('More than 1 business')+chk('Up to 3 team members, each with their own permissions')+chk('PDF and Excel report downloads')+chk('Automatic daily backups')+'</ul></div>'+
   '<div class="field"><label for="pRegion">Country</label><select class="in" id="pRegion" name="country">'+countryOptions((S.profile&&S.profile.country)||guess)+'</select><small>Please, select your country</small></div>'+
   '<div class="field"><label>Duration</label><div class="seg" role="radiogroup" id="pPeriod"></div></div>'+
   '<div class="field"><label>Payment method</label><div class="stack" id="pMethod" style="gap:8px"></div></div>'+
@@ -482,7 +527,13 @@ document.addEventListener('submit',async function(e){var f=e.target;if(f.id!=='a
  }catch(x){fail(fe(x))}});
 document.addEventListener('change',function(e){var t=e.target;if(t.dataset&&t.dataset.showpw){var i=$('#'+t.dataset.showpw);if(i)i.type=t.checked?'text':'password'}});
 
-async function signOut(){try{await sb.auth.signOut()}catch(e){}S.user=null;S.profile=null;S.biz=[];S.bid=null;S.ready=false;$('#layer').innerHTML='';authScreen('in')}
+async function signOut(){try{await sb.auth.signOut()}catch(e){}S.user=null;S.profile=null;S.biz=[];S.bid=null;S.ready=false;$('#layer').innerHTML='';try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}authScreen('in')}
+function deleteAcctModal(){modal('<h2>Delete your account?</h2><p><b>This cannot be undone.</b> All your saved data will be deleted for good: every business you own, all income, expenses, debtors and repayments, and your team members\' access. Any remaining Premium time is lost and is not refunded.</p>'+err0+
+  fld('fdel','Type DELETE to confirm','<input class="in" id="fdel" name="x" autocomplete="off" autocapitalize="characters" placeholder="DELETE">')+'<div class="actions">'+cancel+'<button class="btn danger" type="submit">Yes, delete everything</button></div>',
+  async function(f){if((f.get('x')||'').trim().toUpperCase()!=='DELETE')return 'Type the word DELETE to confirm.';
+   var r=await sb.rpc('delete_my_account');if(r.error)return fe(r.error);
+   try{await sb.auth.signOut()}catch(e){}S.user=null;S.profile=null;S.biz=[];S.bid=null;S.ready=false;store.set('lg_bid','');
+   try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}$('#app').hidden=true;authScreen('in');toast('Your account and data have been deleted')})}
 function confirmOut(){modal('<h2>Log out?</h2><p>Your records are safe. You can sign back in any time.</p><div class="actions">'+cancel+'<button class="btn" type="submit">Log out</button></div>',function(){setTimeout(signOut,0)})}
 
 /* ---------- boot ---------- */
@@ -507,6 +558,8 @@ document.addEventListener('click',async function(e){
  if(el.id==='logoutLink'){e.preventDefault();openMenu(false);confirmOut();return}
  if(el.id==='moreBtn'){openMenu(true);return}
  if(el.id==='logoutBtn'){confirmOut();return}
+ if(el.id==='delAcctBtn'){deleteAcctModal();return}
+ if(a.dl){downloadReport(a.dl);return}
  if(el.id==='helpBtn'){feedbackModal();return}
  if(a.auth){e.preventDefault();authScreen(a.auth);return}
  if(!S.user)return;
@@ -566,7 +619,7 @@ if(!sb){setupScreen()}
 else{
  sb.auth.onAuthStateChange(function(ev,session){
   if(ev==='PASSWORD_RECOVERY'){S.user=session&&session.user;authScreen('recover');return}
-  if(ev==='SIGNED_IN'&&session){if(S.user&&S.user.id===session.user.id)return;setTimeout(boot,0)}
+  if(ev==='SIGNED_IN'&&session){if(S.user&&S.user.id===session.user.id)return;try{history.replaceState(null,'',location.pathname+location.search+'#overview')}catch(e){}setTimeout(boot,0)}
   if(ev==='SIGNED_OUT'){S.user=null}
  });
  boot();
